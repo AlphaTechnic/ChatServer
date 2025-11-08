@@ -43,6 +43,7 @@ enum class PacketType : short
     ChatNtf,
     UserEnterNtf, // 다른 유저가 입장/퇴장했음을 알림
     UserLeaveNtf,
+    UserListNtf, // "이미 방에 있는" 유저 리스트
 };
 
 // 모든 패킷의 기본이 되는 헤더
@@ -127,6 +128,12 @@ struct PktUserLeaveNtf : public PacketHeader
     char userID[MAX_USER_ID_LEN];
 };
 
+// S -> C : (로비/방) 현재 '이미 있는' 유저 리스트 알림
+struct PktUserListNtf : public PacketHeader
+{
+    short userCount;
+};
+
 #pragma pack(pop)
 
 
@@ -190,48 +197,112 @@ void PostSend(Session* pSession, char* pPacket, int size);
 void ProcessPacket(Session* pSession, char* pPacketData);
 
 // (v2 추가) --- Room 클래스 ---
+// (v4) Room 클래스 수정
 class Room
 {
 public:
     Room(int id) : m_roomID(id) {}
-
-    // 유저 추가
+    // (v7 수정) AddUser - 가변 길이 패킷 사용
     bool AddUser(Session* pSession)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+
         if (m_sessions.size() >= MAX_ROOM_USERS)
         {
-            return false; // (요구사항) 방이 꽉 참
+            return false;
+        }
+        // --- (v7 수정) 1. 가변 길이 유저 리스트 패킷 생성 ---
+        short userCount = (short)m_sessions.size();
+        if (userCount > 0)
+        {
+            // 1-1. 패킷 전체 크기 계산: (헤더 + userCount 필드) + (ID 데이터)
+            int dataSize = userCount * MAX_USER_ID_LEN;
+            int totalSize = sizeof(PktUserListNtf) + dataSize;
+
+            // 1-2. 로컬 버퍼 생성 (PostSend가 복사해가므로 로컬 변수여도 안전)
+            std::vector<char> packetBuffer(totalSize);
+
+            // 1-3. 버퍼에 헤더/데이터 채우기
+            PktUserListNtf* pNtf = reinterpret_cast<PktUserListNtf*>(packetBuffer.data());
+            pNtf->packetLength = (short)totalSize;
+            pNtf->type = PacketType::UserListNtf;
+            pNtf->userCount = userCount;
+
+            // 1-4. (중요) 헤더 바로 뒷 공간(데이터 영역) 포인터 획득
+            char* pData = (char*)(pNtf + 1); // pNtf 포인터에서 1만큼(sizeof(PktUserListNtf)) 이동
+
+            // 1-5. 데이터 영역에 유저 ID 목록 복사
+            int offset = 0;
+            for (auto& pair : m_sessions)
+            {
+                Session* pExistingUser = pair.second;
+                memcpy(pData + offset, pExistingUser->userID.c_str(), MAX_USER_ID_LEN);
+                offset += MAX_USER_ID_LEN;
+            }
+
+            // 1-6. 완성된 가변 패킷 전송
+            PostSend(pSession, packetBuffer.data(), totalSize);
         }
 
+        // --- 2. '기존' 유저들에게 '새' 유저 입장 알림 (v6와 동일) ---
+        PktUserEnterNtf enterNtf;
+        enterNtf.packetLength = sizeof(enterNtf);
+        enterNtf.type = PacketType::UserEnterNtf;
+        strncpy_s(enterNtf.userID, pSession->userID.c_str(), MAX_USER_ID_LEN);
+
+        Broadcast_unsafe((char*)&enterNtf, sizeof(enterNtf), INVALID_SOCKET);
+
+        // --- 3. 맵에 추가 (v6와 동일) ---
         m_sessions[pSession->socket] = pSession;
         pSession->currentRoomID = m_roomID;
 
-        std::cout << "[Room " << m_roomID << "] User '" << pSession->userID << "' entered. (Total: " << m_sessions.size() << ")" << std::endl;
+        std::cout << "[Lobby] User '" << pSession->userID << "' entered. (Total: " << m_sessions.size() << ")" << std::endl;
 
-        // (요구사항) 방에 있는 유저 식별
-        // TODO: 새로 들어온 유저에게 현재 방의 유저 리스트 전송
-        // TODO: 기존 방 유저들에게 새 유저 입장 알림 (PktUserEnterNtf)
-
-        return true;
+		return true;
     }
 
-    // 유저 제거
+    // (v4 수정) RemoveUser
     void RemoveUser(Session* pSession)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_sessions.erase(pSession->socket);
-        pSession->currentRoomID = LOBBY_ID; // 로비로 설정
+
+        if (m_sessions.erase(pSession->socket) == 0)
+        {
+            return;
+        }
+
+        pSession->currentRoomID = LOBBY_ID;
 
         std::cout << "[Room " << m_roomID << "] User '" << pSession->userID << "' left. (Total: " << m_sessions.size() << ")" << std::endl;
 
-        // TODO: 방에 남아있는 유저들에게 퇴장 알림 (PktUserLeaveNtf)
+        PktUserLeaveNtf leaveNtf;
+        leaveNtf.packetLength = sizeof(leaveNtf);
+        leaveNtf.type = PacketType::UserLeaveNtf;
+        strncpy_s(leaveNtf.userID, pSession->userID.c_str(), MAX_USER_ID_LEN);
+
+        // (v4 수정) Broadcast() 대신 Broadcast_unsafe() 호출
+        Broadcast_unsafe((char*)&leaveNtf, sizeof(leaveNtf), INVALID_SOCKET);
     }
 
-    // (요구사항) 브로드캐스팅
+    // (v4 수정) Broadcast
     void Broadcast(char* pPacket, int size, SOCKET exceptSocket = INVALID_SOCKET)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        // (v4 수정) 로직을 헬퍼 함수로 이동
+        Broadcast_unsafe(pPacket, size, exceptSocket);
+    }
+
+    int GetID() { return m_roomID; }
+    int GetUserCount() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return static_cast<int>(m_sessions.size());
+    }
+
+private:
+    // (v4 추가) 뮤텍스를 잠그지 않는 헬퍼 함수
+    void Broadcast_unsafe(char* pPacket, int size, SOCKET exceptSocket)
+    {
+        // (Lock 없음!)
         for (auto& pair : m_sessions)
         {
             if (pair.first != exceptSocket)
@@ -241,49 +312,106 @@ public:
         }
     }
 
-    int GetID() { return m_roomID; }
-    int GetUserCount() {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        return m_sessions.size();
-    }
-
 private:
-    std::mutex m_mutex; // (v2 추가) 이 방의 데이터 보호용 뮤텍스
+    std::mutex m_mutex;
     int m_roomID;
     std::unordered_map<SOCKET, Session*> m_sessions;
 };
 
 // (v2 추가) --- Lobby 클래스 ---
 // Room과 거의 동일하지만, 입장 제한이 없음
+// (v4) Lobby 클래스 수정
 class Lobby
 {
 public:
+    // (v4 수정) AddUser
+    // (v7 수정) AddUser - 가변 길이 패킷 사용
     void AddUser(Session* pSession)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+
+        // --- (v7 수정) 1. 가변 길이 유저 리스트 패킷 생성 ---
+        short userCount = (short)m_sessions.size();
+        if (userCount > 0)
+        {
+            // 1-1. 패킷 전체 크기 계산: (헤더 + userCount 필드) + (ID 데이터)
+            int dataSize = userCount * MAX_USER_ID_LEN;
+            int totalSize = sizeof(PktUserListNtf) + dataSize;
+
+            // 1-2. 로컬 버퍼 생성 (PostSend가 복사해가므로 로컬 변수여도 안전)
+            std::vector<char> packetBuffer(totalSize);
+
+            // 1-3. 버퍼에 헤더/데이터 채우기
+            PktUserListNtf* pNtf = reinterpret_cast<PktUserListNtf*>(packetBuffer.data());
+            pNtf->packetLength = (short)totalSize;
+            pNtf->type = PacketType::UserListNtf;
+            pNtf->userCount = userCount;
+
+            // 1-4. (중요) 헤더 바로 뒷 공간(데이터 영역) 포인터 획득
+            char* pData = (char*)(pNtf + 1); // pNtf 포인터에서 1만큼(sizeof(PktUserListNtf)) 이동
+
+            // 1-5. 데이터 영역에 유저 ID 목록 복사
+            int offset = 0;
+            for (auto& pair : m_sessions)
+            {
+                Session* pExistingUser = pair.second;
+                memcpy(pData + offset, pExistingUser->userID.c_str(), MAX_USER_ID_LEN);
+                offset += MAX_USER_ID_LEN;
+            }
+
+            // 1-6. 완성된 가변 패킷 전송
+            PostSend(pSession, packetBuffer.data(), totalSize);
+        }
+
+        // --- 2. '기존' 유저들에게 '새' 유저 입장 알림 (v6와 동일) ---
+        PktUserEnterNtf enterNtf;
+        enterNtf.packetLength = sizeof(enterNtf);
+        enterNtf.type = PacketType::UserEnterNtf;
+        strncpy_s(enterNtf.userID, pSession->userID.c_str(), MAX_USER_ID_LEN);
+
+        Broadcast_unsafe((char*)&enterNtf, sizeof(enterNtf), INVALID_SOCKET);
+
+        // --- 3. 맵에 추가 (v6와 동일) ---
         m_sessions[pSession->socket] = pSession;
         pSession->currentRoomID = LOBBY_ID;
 
         std::cout << "[Lobby] User '" << pSession->userID << "' entered. (Total: " << m_sessions.size() << ")" << std::endl;
-
-        // (요구사항) 로비에 있는 유저 식별
-        // TODO: 새로 들어온 유저에게 로비 유저 리스트 전송
-        // TODO: 기존 로비 유저들에게 새 유저 입장 알림 (PktUserEnterNtf)
     }
 
+    // (v4 수정) RemoveUser
     void RemoveUser(Session* pSession)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_sessions.erase(pSession->socket);
+
+        if (m_sessions.erase(pSession->socket) == 0)
+        {
+            return;
+        }
 
         std::cout << "[Lobby] User '" << pSession->userID << "' left. (Total: " << m_sessions.size() << ")" << std::endl;
 
-        // TODO: 로비에 남아있는 유저들에게 퇴장 알림 (PktUserLeaveNtf)
+        PktUserLeaveNtf leaveNtf;
+        leaveNtf.packetLength = sizeof(leaveNtf);
+        leaveNtf.type = PacketType::UserLeaveNtf;
+        strncpy_s(leaveNtf.userID, pSession->userID.c_str(), MAX_USER_ID_LEN);
+
+        // (v4 수정) Broadcast() 대신 Broadcast_unsafe() 호출
+        Broadcast_unsafe((char*)&leaveNtf, sizeof(leaveNtf), INVALID_SOCKET);
     }
 
+    // (v4 수정) Broadcast
     void Broadcast(char* pPacket, int size, SOCKET exceptSocket = INVALID_SOCKET)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        // (v4 수정) 로직을 헬퍼 함수로 이동
+        Broadcast_unsafe(pPacket, size, exceptSocket);
+    }
+
+private:
+    // (v4 추가) 뮤텍스를 잠그지 않는 헬퍼 함수
+    void Broadcast_unsafe(char* pPacket, int size, SOCKET exceptSocket)
+    {
+        // (Lock 없음!)
         for (auto& pair : m_sessions)
         {
             if (pair.first != exceptSocket)
@@ -437,6 +565,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
         break;
     }
 
+    // (v9 수정) ProcessPacket - EnterRoomReq 케이스
     case PacketType::EnterRoomReq:
     {
         if (!pSession->isLoggedIn || pSession->currentRoomID != LOBBY_ID) break;
@@ -444,28 +573,30 @@ void ProcessPacket(Session* pSession, char* pPacketData)
         PktEnterRoomReq* pReq = reinterpret_cast<PktEnterRoomReq*>(pPacketData);
         Room* pRoom = g_RoomManager.GetRoom(pReq->roomID);
 
-        PktEnterRoomRes res; // 응답 패킷 미리 준비
+        PktEnterRoomRes res;
         res.packetLength = sizeof(res);
         res.type = PacketType::EnterRoomRes;
 
-        if (pRoom == nullptr) // 방이 없음
+        if (pRoom == nullptr) // 1. 방이 없는 경우
         {
             res.success = false;
+            res.roomID = pReq->roomID; // (v9 추가) 실패해도 ID는 알려줌
         }
         else
         {
-            // (요구사항) 50명 제한
+            // 2. 방이 있음 -> 입장 시도
             if (pRoom->AddUser(pSession))
             {
-                // 입장 성공
-                g_Lobby.RemoveUser(pSession); // 로비에서 제거
-                res.success = true;
+                // 2a. 입장 성공
+                g_Lobby.RemoveUser(pSession);
+                res.success = true; // <-- **이 라인이 핵심입니다!**
                 res.roomID = pRoom->GetID();
             }
             else
             {
-                // 입장 실패 (방 꽉 참)
+                // 2b. 입장 실패 (방 꽉 참)
                 res.success = false;
+                res.roomID = pRoom->GetID();
             }
         }
         PostSend(pSession, (char*)&res, res.packetLength);
@@ -769,7 +900,7 @@ int main()
         std::cout << "Client connected from " << clientIp << ":" << ntohs(clientAddr.sin_port) << std::endl;
 
         // 1. (v2 수정) 세션 생성 (소켓 전달)
-        // dummy
+        // 
         Session* pSession = new Session(clientSocket);
 
         // 2. IOCP에 연결 (CompletionKey로 pSession 전달)
