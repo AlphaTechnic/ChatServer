@@ -769,6 +769,7 @@ int main()
         std::cout << "Client connected from " << clientIp << ":" << ntohs(clientAddr.sin_port) << std::endl;
 
         // 1. (v2 수정) 세션 생성 (소켓 전달)
+        // dummy
         Session* pSession = new Session(clientSocket);
 
         // 2. IOCP에 연결 (CompletionKey로 pSession 전달)
