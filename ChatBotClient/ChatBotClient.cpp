@@ -56,8 +56,6 @@ enum class NodeStatus
 {
     Success,
     Failure
-    // (참고) 비동기/지연 행동을 위해 'Running'을 추가할 수 있으나,
-    // 이 예제에서는 모든 Action을 즉시 실행(Fire-and-forget)으로 간주
 };
 
 // 봇의 현재 상태
@@ -76,7 +74,6 @@ class Node
 {
 public:
     virtual ~Node() = default;
-    // 이 노드를 실행 (Tick)
     virtual NodeStatus Tick(Bot* bot) = 0;
 };
 
@@ -100,8 +97,6 @@ protected:
 
 /**
  * @brief (Selector 노드 - 'OR' 연산)
- * 자식 노드 중 하나라도 Success를 반환하면 즉시 Success를 반환.
- * 모든 자식이 Failure를 반환해야 Failure를 반환.
  */
 class Selector : public CompositeNode
 {
@@ -121,8 +116,6 @@ public:
 
 /**
  * @brief (Sequence 노드 - 'AND' 연산)
- * 모든 자식 노드가 Success를 반환해야 Success를 반환.
- * 하나라도 Failure를 반환하면 즉시 Failure를 반환.
  */
 class Sequence : public CompositeNode
 {
@@ -143,9 +136,6 @@ public:
 
 /**
  * @brief (Probabilistic Selector 노드 - '확률적 OR' 연산)
- * 요구사항의 "의사 확률 설정"
- * 각 자식 노드에 부여된 가중치(Weight)에 따라 랜덤으로 하나를 선택해 실행.
- * 선택된 자식의 결과를 그대로 반환.
  */
 class ProbabilisticSelector : public CompositeNode
 {
@@ -170,7 +160,7 @@ public:
             totalWeight += w;
         }
 
-        if (totalWeight <= 0.0) // 가중치 합이 0이면 실행 불가
+        if (totalWeight <= 0.0)
         {
             return NodeStatus::Failure;
         }
@@ -186,8 +176,6 @@ public:
                 return m_children[i]->Tick(bot); // 선택된 자식 실행
             }
         }
-
-        // (비상) 여기까지 오면 안 됨
         return m_children.back()->Tick(bot);
     }
 
@@ -210,7 +198,7 @@ private:
     BotState m_targetState;
 };
 
-// (Action) 서버에 접속 시도 (유일한 블로킹 Action)
+// (Action) 서버에 접속 시도
 class Act_TryConnect : public Node
 {
 public:
@@ -241,8 +229,9 @@ public:
     virtual NodeStatus Tick(Bot* bot) override;
 };
 
-// (Action) 방 입장 요청 (테스트를 위해 0, 1, 2번 방 랜덤 입장 시도)
-class Act_SendEnterRoom : public Node
+// [업데이트]
+// (Action) 랜덤 방 입장 요청 (서버에 매칭 요청)
+class Act_SendEnterRandomRoom : public Node
 {
 public:
     virtual NodeStatus Tick(Bot* bot) override;
@@ -286,9 +275,6 @@ public:
 // 3. 봇(Bot) 클래스 구현
 // =======================================================================
 
-/**
- * @brief 봇 1개(스레드 1개)를 담당하는 클래스
- */
 class Bot
 {
 public:
@@ -318,8 +304,6 @@ public:
         BuildBehaviorTree();
 
         // 2. 수신 스레드 시작
-        // (주의) 수신 스레드는 Bot::Run 스레드와 분리되어
-        // m_state를 비동기적으로 변경시킴
         std::thread recvTh(&Bot::RecvThread, this);
         recvTh.detach();
 
@@ -328,11 +312,10 @@ public:
         {
             if (m_behaviorTree)
             {
-                // BT의 루트부터 매번 다시 평가
                 m_behaviorTree->Tick(this);
             }
 
-            // 봇의 행동 주기 (너무 빠르지 않게)
+            // 봇의 행동 주기
             int thinkTime = GetRandomInt(500, 2000); // 0.5초 ~ 2초
             std::this_thread::sleep_for(std::chrono::milliseconds(thinkTime));
         }
@@ -345,11 +328,8 @@ public:
     {
         if (!m_isRunning.exchange(false))
         {
-            return; // 이미 중지됨
+            return;
         }
-
-        // Recv 스레드가 recv()에서 블록되어 있을 수 있으므로
-        // 소켓을 닫아 즉시 종료시킴
         if (m_socket != INVALID_SOCKET)
         {
             closesocket(m_socket);
@@ -390,7 +370,6 @@ public:
         }
 
         Log("[" + m_userID + "] Connected to server.");
-        // (중요) 상태 변경
         m_state.store(BotState::Connected);
         return true;
     }
@@ -406,9 +385,7 @@ public:
         if (send(m_socket, pPacket, size, 0) == SOCKET_ERROR)
         {
             Log("[" + m_userID + "] Send failed!");
-            // (참고) Send 실패 시 연결이 끊겼을 수 있으므로
-            // m_state를 Disconnected로 변경하는 로직이 필요할 수 있음
-            Stop(); // 간단하게 봇 중지
+            Stop();
         }
     }
 
@@ -435,24 +412,21 @@ private:
             int nRecv = recv(m_socket, recvBuffer, MAX_BUFFER_SIZE, 0);
             if (nRecv <= 0)
             {
-                // 서버 접속 끊김
                 Log("[" + m_userID + "] Server disconnected.");
-                m_state.store(BotState::Disconnected); // BT가 다시 접속 시도하도록
+                m_state.store(BotState::Disconnected);
                 closesocket(m_socket);
                 m_socket = INVALID_SOCKET;
 
-                // m_isRunning이 false가 되면 이 스레드도 자동 종료
                 if (m_isRunning.load() == false)
                 {
                     break;
                 }
 
-                // 봇이 살아있다면 재접속을 위해 잠시 대기
                 std::this_thread::sleep_for(std::chrono::milliseconds(3000));
                 continue;
             }
 
-            // (기존 ChatClient와 동일한 패킷 파싱 로직)
+            // 패킷 파싱 로직
             memcpy(m_packetBuffer + m_currentPacketSize, recvBuffer, nRecv);
             m_currentPacketSize += nRecv;
 
@@ -484,7 +458,6 @@ private:
     {
         PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(pPacketData);
 
-        // (중요) 서버의 응답에 따라 봇의 상태(m_state)를 변경
         switch (pHeader->type)
         {
         case PacketType::LoginRes:
@@ -498,7 +471,6 @@ private:
             else
             {
                 Log("[" + m_userID + "] 로그인 실패");
-                // (실패 시 Disconnected로 돌려서 BT가 재시도하게 할 수 있음)
             }
             break;
         }
@@ -517,6 +489,9 @@ private:
             }
             break;
         }
+        // [업데이트]
+        // 랜덤 입장이든, 지정 입장이든 서버는 PktEnterRoomRes로 응답함
+        // 따라서 이 로직은 수정할 필요가 없음 (서버의 응답을 그대로 처리)
         case PacketType::EnterRoomRes:
         {
             PktEnterRoomRes* pRes = reinterpret_cast<PktEnterRoomRes*>(pPacketData);
@@ -528,7 +503,8 @@ private:
             }
             else
             {
-                Log("[" + m_userID + "] 방 입장 실패");
+                // (PktEnterRandomRoomReq에 대한 실패 응답도 여기로 옴)
+                Log("[" + m_userID + "] 방 입장 실패 (방이 없거나/꽉 찼거나/입장 가능한 방 없음)");
             }
             break;
         }
@@ -544,16 +520,10 @@ private:
             break;
         }
         case PacketType::ChatNtf:
-        {
-            PktChatNtf* pNtf = reinterpret_cast<PktChatNtf*>(pPacketData);
-            // 봇은 채팅을 받기만 하고 별도 처리는 안 함 (로그만 출력)
-            // Log("[" + m_userID + "][RECV] " + pNtf->userID + ": " + pNtf->message);
-            break;
-        }
         case PacketType::UserEnterNtf:
         case PacketType::UserLeaveNtf:
         case PacketType::UserListNtf:
-            // 봇은 유저 리스트 관리를 하지 않으므로 무시
+            // 봇은 다른 유저 정보나 채팅 수신을 무시
             break;
 
         default:
@@ -587,8 +557,9 @@ private:
 
         auto probLobby = std::make_unique<ProbabilisticSelector>(); // 확률 노드
         probLobby->AddChild(std::make_unique<Act_SendChat>(true), 70.0); // 70% 로비 채팅
-        probLobby->AddChild(std::make_unique<Act_SendCreateRoom>(), 10.0); // 10% 방 생성
-        probLobby->AddChild(std::make_unique<Act_SendEnterRoom>(), 15.0); // 15% 방 입장
+        probLobby->AddChild(std::make_unique<Act_SendCreateRoom>(), 15.0); // 15% 방 생성
+        // [업데이트] Act_SendEnterRoom -> Act_SendEnterRandomRoom
+        probLobby->AddChild(std::make_unique<Act_SendEnterRandomRoom>(), 10.0); // 10% 랜덤 방 입장
         probLobby->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% 아무것도 안함
 
         seqLobby->AddChild(std::move(probLobby));
@@ -616,16 +587,15 @@ private:
     std::string m_userID;
     SOCKET m_socket;
 
-    // (중요) 두 개의 스레드(Run, Recv)에서 접근하는 상태 변수
     std::atomic<BotState> m_state;
     std::atomic<int> m_currentRoomID;
     std::atomic<bool> m_isRunning;
 
-    // (Recv 스레드 전용) 패킷 파싱용 버퍼
+    // (Recv 스레드 전용)
     char m_packetBuffer[MAX_BUFFER_SIZE * 2];
     int m_currentPacketSize;
 
-    // (Run 스레드 전용) 행동 트리
+    // (Run 스레드 전용)
     std::unique_ptr<Node> m_behaviorTree;
 };
 
@@ -655,7 +625,7 @@ NodeStatus Act_SendLogin::Tick(Bot* bot)
     strncpy_s(req.userID, bot->GetUserID().c_str(), MAX_USER_ID_LEN);
 
     bot->SendPacket((char*)&req, req.packetLength);
-    return NodeStatus::Success; // (주의) 전송 성공이지, 로그인 성공이 아님
+    return NodeStatus::Success;
 }
 
 NodeStatus Act_SendChat::Tick(Bot* bot)
@@ -688,15 +658,14 @@ NodeStatus Act_SendCreateRoom::Tick(Bot* bot)
     return NodeStatus::Success;
 }
 
-NodeStatus Act_SendEnterRoom::Tick(Bot* bot)
+// [업데이트]
+NodeStatus Act_SendEnterRandomRoom::Tick(Bot* bot)
 {
-    int targetRoomID = GetRandomInt(0, 2); // 0, 1, 2번 방 중 랜덤 입장 시도
-    Log("[" + bot->GetUserID() + "] (Action) 방 입장 요청 (Target: " + std::to_string(targetRoomID) + ")");
+    Log("[" + bot->GetUserID() + "] (Action) 랜덤 방 입장 요청");
 
-    PktEnterRoomReq req;
+    PktEnterRandomRoomReq req;
     req.packetLength = sizeof(req);
-    req.type = PacketType::EnterRoomReq;
-    req.roomID = targetRoomID;
+    req.type = PacketType::EnterRandomRoomReq;
 
     bot->SendPacket((char*)&req, req.packetLength);
     return NodeStatus::Success;
@@ -752,7 +721,6 @@ int main()
     // 3. 봇 스레드 시작
     for (auto& bot : bots)
     {
-        // 각 봇의 Run() 함수를 새 스레드에서 실행
         botThreads.emplace_back(&Bot::Run, bot.get());
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // (접속 부하 분산)
     }
@@ -769,7 +737,7 @@ int main()
     Log("--- 봇 종료 신호 전송 중... ---");
     for (auto& bot : bots)
     {
-        bot->Stop(); // 각 봇에게 중지 신호
+        bot->Stop();
     }
 
     Log("--- 모든 봇 스레드가 종료되기를 기다리는 중... ---");
