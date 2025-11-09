@@ -15,15 +15,13 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define SERVER_IP "127.0.0.1" // 서버 IP
-
 // --- 전역 변수 및 유틸리티 ---
 
 // 스레드 안전한 로깅을 위한 뮤텍스
 std::mutex g_logMutex;
 
 // 스레드 안전한 콘솔 출력
-void Log(const std::string& message)
+static void Log(const std::string& message)
 {
     std::lock_guard<std::mutex> lock(g_logMutex);
     std::cout << message << std::endl;
@@ -33,14 +31,14 @@ void Log(const std::string& message)
 thread_local std::mt19937 g_rng(std::random_device{}() + static_cast<unsigned int>(std::hash<std::thread::id>{}(std::this_thread::get_id())));
 
 // 범위 내 정수 난수 생성
-int GetRandomInt(int min, int max)
+static int GetRandomInt(int min, int max)
 {
     std::uniform_int_distribution<int> dist(min, max);
     return dist(g_rng);
 }
 
 // 범위 내 실수 난수 생성 (확률용)
-double GetRandomDouble(double min, double max)
+static double GetRandomDouble(double min, double max)
 {
     std::uniform_real_distribution<double> dist(min, max);
     return dist(g_rng);

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 // --- 공통 상수 정의 ---
+constexpr const char* SERVER_IP = "127.0.0.1"; // 서버 IP (localhost)
 constexpr int SERVER_PORT = 9000;
 constexpr int MAX_BUFFER_SIZE = 4096; // 공통 버퍼 크기
 constexpr int MAX_ROOM_USERS = 50;

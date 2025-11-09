@@ -8,12 +8,10 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define SERVER_IP "127.0.0.1" // 서버 IP (localhost
-
 /**
  * @brief 서버로부터 받은 패킷을 처리하는 함수
  */
-void ProcessPacket(char* pPacketData)
+static void ProcessPacket(char* pPacketData)
 {
 	PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(pPacketData);
 
@@ -108,7 +106,7 @@ void ProcessPacket(char* pPacketData)
 /**
  * @brief (Recv 스레드) 서버로부터 패킷을 수신하는 스레드
  */
-void RecvThread(SOCKET serverSocket)
+static void RecvThread(SOCKET serverSocket)
 {
 	char recvBuffer[MAX_BUFFER_SIZE]; // 서버에서 받은 원시 데이터
 	char packetBuffer[MAX_BUFFER_SIZE * 2]; // 패킷 조립용 버퍼
