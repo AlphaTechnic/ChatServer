@@ -9,128 +9,9 @@
 #include <atomic>        // (v2 추가)
 #include <memory>        // (v2 추가)
 
+#include "Protocol.h"
+
 #pragma comment(lib, "ws2_32.lib")
-
-#define SERVER_PORT 9000
-#define MAX_BUFFER_SIZE 4096
-
-// (v2 추가) --- 상수 정의 ---
-constexpr int MAX_ROOM_USERS = 50;
-constexpr int LOBBY_ID = -1;
-constexpr int MAX_USER_ID_LEN = 16;
-constexpr int MAX_CHAT_LEN = 128;
-
-// (v2 추가) --- 패킷 프로토콜 정의 ---
-// C/C++ 컴파일러가 구조체를 메모리에 정렬할 때
-// 멤버 변수 사이에 패딩(빈 공간)을 넣지 않도록 1바이트 크기로 정렬
-#pragma pack(push, 1)
-
-// 패킷의 종류
-enum class PacketType : short
-{
-    // Client -> Server
-    LoginReq,
-    CreateRoomReq,
-    EnterRoomReq,
-    LeaveRoomReq,
-    ChatReq,
-
-    // Server -> Client
-    LoginRes,
-    CreateRoomRes,
-    EnterRoomRes,
-    LeaveRoomRes,
-    ChatNtf,
-    UserEnterNtf, // 다른 유저가 입장/퇴장했음을 알림
-    UserLeaveNtf,
-};
-
-// 모든 패킷의 기본이 되는 헤더
-struct PacketHeader
-{
-    short packetLength;
-    PacketType type;
-};
-
-// C -> S : 로그인 요청
-struct PktLoginReq : public PacketHeader
-{
-    char userID[MAX_USER_ID_LEN];
-};
-
-// S -> C : 로그인 응답
-struct PktLoginRes : public PacketHeader
-{
-    bool success;
-};
-
-// C -> S : 채팅방 생성 요청
-struct PktCreateRoomReq : public PacketHeader
-{
-    // (간단하게 일단 방 제목 없이)
-};
-
-// S -> C : 채팅방 생성 응답
-struct PktCreateRoomRes : public PacketHeader
-{
-    bool success;
-    int newRoomID;
-};
-
-// C -> S : 채팅방 입장 요청
-struct PktEnterRoomReq : public PacketHeader
-{
-    int roomID;
-};
-
-// S -> C : 채팅방 입장 응답
-struct PktEnterRoomRes : public PacketHeader
-{
-    bool success;
-    int roomID;
-    // TODO: (요구사항) 방에 있는 유저 리스트 전송
-};
-
-// C -> S : 채팅방 퇴장 요청 (로비로 돌아가기)
-struct PktLeaveRoomReq : public PacketHeader
-{
-};
-
-// S -> C : 채팅방 퇴장 응답
-struct PktLeaveRoomRes : public PacketHeader
-{
-    bool success;
-};
-
-// C -> S : 채팅 전송
-struct PktChatReq : public PacketHeader
-{
-    char message[MAX_CHAT_LEN];
-};
-
-// S -> C : 채팅 알림 (브로드캐스팅용)
-struct PktChatNtf : public PacketHeader
-{
-    char userID[MAX_USER_ID_LEN];
-    char message[MAX_CHAT_LEN];
-};
-
-// S -> C : (로비/방) 새 유저 입장 알림
-struct PktUserEnterNtf : public PacketHeader
-{
-    char userID[MAX_USER_ID_LEN];
-};
-
-// S -> C : (로비/방) 유저 퇴장 알림
-struct PktUserLeaveNtf : public PacketHeader
-{
-    char userID[MAX_USER_ID_LEN];
-};
-
-#pragma pack(pop)
-
-
-// --- 핵심 데이터 구조 ---
 
 // I/O 작업의 종류를 구분하기 위한 열거형
 enum class IOOperation
@@ -244,7 +125,7 @@ public:
     int GetID() { return m_roomID; }
     int GetUserCount() {
         std::lock_guard<std::mutex> lock(m_mutex);
-        return m_sessions.size();
+        return static_cast<int>(m_sessions.size());
     }
 
 private:
