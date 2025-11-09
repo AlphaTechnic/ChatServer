@@ -10,6 +10,7 @@
 #include <memory>		// (v2 추가)
 #include <random>		// (랜덤 입장 추가)
 #include <chrono>		// [Timeout 추가]
+#include <deque>		// [In-Memory DB] deque (양방향 큐) 헤더 추가
 
 #include "Protocol.h"
 
@@ -20,6 +21,8 @@
 constexpr int SESSION_TIMEOUT_SECONDS = 60;
 // 5초마다 타임아웃 검사
 constexpr int TIMEOUT_CHECK_INTERVAL_MS = 5000;
+// [In-Memory DB] DB 정리 주기 (예: 1시간)
+constexpr int DB_CLEANUP_INTERVAL_HOURS = 1;
 
 
 // I/O 작업의 종류를 구분하기 위한 열거형
@@ -294,13 +297,71 @@ std::unordered_map<SOCKET, Session*> g_sessions;
 std::mutex g_sessionMutex;
 
 
+// [In-Memory DB] --- 인메모리 DB 자료구조 ---
+struct ChatLogEntry
+{
+	std::chrono::system_clock::time_point timestamp; // 타임스탬프 (system_clock 사용)
+	int roomID;
+	std::string userID;
+	std::string message;
+};
+
+std::deque<ChatLogEntry> g_chatLogDB; // 채팅 로그를 저장할 덱
+std::mutex g_dbMutex; // g_chatLogDB 접근 제어를 위한 뮤텍스
+
+
+// [In-Memory DB] --- DB 헬퍼 함수 ---
+
+/**
+ * @brief 채팅 메시지를 인메모리 DB에 저장 (스레드 안전)
+ */
+void LogChatMessage(int roomID, const std::string& userID, const std::string& message)
+{
+	std::lock_guard<std::mutex> lock(g_dbMutex); // (중요) DB 접근 잠금
+
+	g_chatLogDB.push_back({
+		std::chrono::system_clock::now(), // 현재 시간 (wall clock)
+		roomID,
+		userID,
+		message
+		});
+
+	// (디버그용: 로그가 너무 많이 쌓이므로 주석 처리)
+	// std::cout << "[DB] Logged: " << userID << " in room " << roomID << ". Total logs: " << g_chatLogDB.size() << std::endl;
+}
+
+/**
+ * @brief [요구사항] 7일이 지난 오래된 로그를 삭제합니다. (스레드 안전)
+ */
+void CleanupOldChatLogs()
+{
+	std::cout << "[DB] Running cleanup for logs older than 7 days..." << std::endl;
+
+	// 7일 전 시간 계산 (C++11/14/17 호환)
+	auto sevenDaysAgo = std::chrono::system_clock::now() - std::chrono::hours(24 * 7);
+	int logsDeleted = 0;
+
+	std::lock_guard<std::mutex> lock(g_dbMutex); // (중요) DB 접근 잠금
+
+	// 덱(deque)의 앞에서부터(오래된 순) 검사
+	// 7일이 지났으면 덱에서 제거(pop_front)
+	while (!g_chatLogDB.empty() && g_chatLogDB.front().timestamp < sevenDaysAgo)
+	{
+		g_chatLogDB.pop_front();
+		logsDeleted++;
+	}
+
+	std::cout << "[DB] Cleanup complete. " << logsDeleted << " old logs deleted. Total logs: " << g_chatLogDB.size() << std::endl;
+}
+
+
 // (v2 추가) --- 핵심 로직 함수 ---
 
 /**
- * @brief 비동기 Send 요청
- * @details 이 함수는 언제나 성공한다고 가정하고 Send용 OverlappedEx를 'new'로 할당.
- * Send 작업이 완료되면 WorkerThread의 'IOOperation::Send'에서 'delete' 해줘야 함.
- */
+ * @brief 비동기 Send 요청
+ * @details 이 함수는 언제나 성공한다고 가정하고 Send용 OverlappedEx를 'new'로 할당.
+ * Send 작업이 완료되면 WorkerThread의 'IOOperation::Send'에서 'delete' 해줘야 함.
+ */
 void PostSend(Session* pSession, char* pPacket, int size)
 {
 	OverlappedEx* pOverlappedEx = new OverlappedEx();
@@ -330,8 +391,8 @@ void PostSend(Session* pSession, char* pPacket, int size)
 }
 
 /**
- * @brief (v2 추가) 완성된 패킷을 처리하는 함수
- */
+ * @brief (v2 추가) 완성된 패킷을 처리하는 함수
+ */
 void ProcessPacket(Session* pSession, char* pPacketData)
 {
 	PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(pPacketData);
@@ -486,12 +547,17 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 
 		PktChatReq* pReq = reinterpret_cast<PktChatReq*>(pPacketData);
 
+		// [In-Memory DB] --- 채팅 로그 저장 ---
+		std::string message(pReq->message, strnlen_s(pReq->message, MAX_CHAT_LEN));
+		LogChatMessage(pSession->currentRoomID, pSession->userID, message);
+		// ------------------------------------
+
 		// (요구사항) 브로드캐스팅
 		PktChatNtf ntf; // 알림 패킷 생성
 		ntf.packetLength = sizeof(ntf);
 		ntf.type = PacketType::ChatNtf;
 		strncpy_s(ntf.userID, pSession->userID.c_str(), MAX_USER_ID_LEN);
-		strncpy_s(ntf.message, pReq->message, MAX_CHAT_LEN);
+		strncpy_s(ntf.message, message.c_str(), MAX_CHAT_LEN); // [In-Memory DB] message 변수 사용
 
 		if (pSession->currentRoomID == LOBBY_ID)
 		{
@@ -518,8 +584,8 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 
 
 /**
- * @brief (v2 추가) 수신된 데이터를 파싱하고 패킷을 조립/처리하는 함수
- */
+ * @brief (v2 추가) 수신된 데이터를 파싱하고 패킷을 조립/처리하는 함수
+ */
 void ProcessRecv(Session* pSession, DWORD bytesTransferred)
 {
 	// 수신한 데이터를 세션의 패킷 버퍼 뒤에 이어 붙임
@@ -554,7 +620,7 @@ void ProcessRecv(Session* pSession, DWORD bytesTransferred)
 		else
 		{
 			// 5. 헤더는 왔지만 데이터가 아직 덜 옴 (TCP 분할 수신)
-			//   -> 다음 Recv를 기다림
+			//   -> 다음 Recv를 기다림
 			break;
 		}
 	}
@@ -687,11 +753,15 @@ void WorkerThread()
 
 // [Timeout 추가]
 /**
- * @brief 주기적으로 모든 세션을 검사하여 타임아웃된 세션을 정리하는 스레드
- */
+ * @brief 주기적으로 모든 세션을 검사하여 타임아웃된 세션을 정리하는 스레드
+ * [In-Memory DB] DB 정리 작업도 이 스레드에서 주기적으로 수행
+ */
 void TimeoutThread()
 {
 	std::cout << "[Debug] Timeout Thread " << std::this_thread::get_id() << " started." << std::endl;
+
+	// [In-Memory DB] 마지막 DB 정리 시간 추적 (steady_clock: 인터벌 측정용)
+	auto lastDbCleanupTime = std::chrono::steady_clock::now();
 
 	while (true)
 	{
@@ -699,6 +769,17 @@ void TimeoutThread()
 		std::this_thread::sleep_for(std::chrono::milliseconds(TIMEOUT_CHECK_INTERVAL_MS));
 
 		auto now = std::chrono::steady_clock::now();
+
+		// [In-Memory DB] --- 주기적 DB 정리 ---
+		// steady_clock 기준으로 1시간(DB_CLEANUP_INTERVAL_HOURS)이 경과했는지 확인
+		auto elapsedSinceCleanup = std::chrono::duration_cast<std::chrono::hours>(now - lastDbCleanupTime);
+		if (elapsedSinceCleanup.count() >= DB_CLEANUP_INTERVAL_HOURS)
+		{
+			CleanupOldChatLogs(); // (내부에서는 system_clock을 사용해 7일 계산)
+			lastDbCleanupTime = now; // 다음 정리 시간 갱신
+		}
+		// ------------------------------------
+
 
 		// 강제 종료할 소켓 리스트 (g_sessionMutex 락을 오래 잡지 않기 위함)
 		std::vector<SOCKET> timedOutSockets;
@@ -881,7 +962,7 @@ int main()
 		if (th.joinable())
 		{
 			// (실제로는 스레드를 종료시키기 위해
-			//  PostQueuedCompletionStatus(g_iocpHandle, 0, NULL, NULL); 를 스레드 개수만큼 호출해야 함)
+			//  PostQueuedCompletionStatus(g_iocpHandle, 0, NULL, NULL); 를 스레드 개수만큼 호출해야 함)
 			th.join();
 		}
 	}
