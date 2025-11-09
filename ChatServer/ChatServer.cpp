@@ -241,7 +241,7 @@ public:
 	 * @brief 입장 가능한 (꽉 차지 않은) 방을 랜덤하게 찾습니다.
 	 * @return 입장 가능한 Room 포인터. 없으면 nullptr.
 	 */
-	Room* GetRandomAvailableRoom()
+	Room* GetRandomAvailableRoomOrNull()
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -422,7 +422,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		if (!pSession->isLoggedIn || pSession->currentRoomID != LOBBY_ID) break;
 
 		// 1. 입장 가능한 랜덤 방 탐색
-		Room* pRoom = g_RoomManager.GetRandomAvailableRoom();
+		Room* pRoom = g_RoomManager.GetRandomAvailableRoomOrNull();
 
 		PktEnterRoomRes res; // 응답은 EnterRoomRes와 동일
 		res.packetLength = sizeof(res);
