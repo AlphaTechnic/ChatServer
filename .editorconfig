@@ -1,0 +1,25 @@
+﻿# .editorconfig
+
+# 최상위 설정 파일임을 명시
+root = true
+
+# 모든 파일에 적용할 규칙
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+# (핵심 1) 모든 파일의 인코딩을 UTF-8 (BOM 없음)로 강제
+charset = utf-8
+
+# (핵심 2) 저장 시 자동으로 모든 줄 끝의 불필요한 공백 제거
+trim_trailing_whitespace = true
+
+# (핵심 3) 저장 시 파일 끝에 항상 새 줄 하나를 삽입 (Git에서 선호)
+insert_final_newline = true
+
+# C++ 헤더 및 소스 파일에만 별도 적용할 규칙 (필요하다면)
+[*.{h,cpp}]
+# (예시) C++ 파일은 탭을 쓴다면
+# indent_style = tab
+# indent_size = 4
