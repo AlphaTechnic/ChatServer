@@ -25,6 +25,7 @@
     <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerCore.h" />
+    <ClInclude Include="Session.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ChatServer.cpp" />
@@ -33,7 +34,6 @@
     <ClCompile Include="IocpManager.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="Session.cpp" />
-    <ClCompile Include="Session.h" />
     <ClCompile Include="pch.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
