@@ -131,7 +131,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="NetworkClient.cpp" />
+    <ClCompile Include="PacketHandler.cpp" />
+    <ClCompile Include="pch.cpp" />
     <ClCompile Include="ChatClient.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NetworkClient.h" />
+    <ClInclude Include="PacketHandler.h" />
+    <ClInclude Include="pch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
