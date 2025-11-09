@@ -1,32 +1,32 @@
 ```
 (Root - Selector '?')
 |
-|--- (Sequence '->') : "Á¢¼Ó ½Ãµµ"
+|--- (Sequence '->') : "ì ‘ì† ì‹œë„"
 |    |
 |    +-- (Condition) : IsState(Disconnected)?
 |    +-- (Action)    : TryConnectToServer()
 |
-|--- (Sequence '->') : "·Î±×ÀÎ ½Ãµµ"
+|--- (Sequence '->') : "ë¡œê·¸ì¸ ì‹œë„"
 |    |
 |    +-- (Condition) : IsState(Connected)?
 |    +-- (Action)    : SendLoginReq()
 |
-|--- (Sequence '->') : "·Îºñ¿¡¼­ Çàµ¿"
+|--- (Sequence '->') : "ë¡œë¹„ì—ì„œ í–‰ë™"
 |    |
 |    +-- (Condition) : IsState(InLobby)?
-|    +-- (Action)    : Wait(1~3ÃÊ ·£´ı ´ë±â)
-|    +-- (Probabilistic Selector '%?') : "·Îºñ Çàµ¿ °áÁ¤"
+|    +-- (Action)    : Wait(1~3ì´ˆ ëœë¤ ëŒ€ê¸°)
+|    +-- (Probabilistic Selector '%?') : "ë¡œë¹„ í–‰ë™ ê²°ì •"
 |        |
 |        +-- [70%] (Action)    : SendLobbyChat()
 |        +-- [15%] (Action)    : SendCreateRoomReq()
-|        +-- [10%] (Action)    : Act_SendEnterRandomRoom() // [¾÷µ¥ÀÌÆ®]
+|        +-- [10%] (Action)    : Act_SendEnterRandomRoom() // [ì—…ë°ì´íŠ¸]
 |        +-- [5%]  (Action)    : DoNothing() (Idle)
 |
-|--- (Sequence '->') : "¹æ¿¡¼­ Çàµ¿"
+|--- (Sequence '->') : "ë°©ì—ì„œ í–‰ë™"
      |
      +-- (Condition) : IsState(InRoom)?
-     +-- (Action)    : Wait(1~5ÃÊ ·£´ı ´ë±â)
-     +-- (Probabilistic Selector '%?') : "¹æ Çàµ¿ °áÁ¤"
+     +-- (Action)    : Wait(1~5ì´ˆ ëœë¤ ëŒ€ê¸°)
+     +-- (Probabilistic Selector '%?') : "ë°© í–‰ë™ ê²°ì •"
          |
          +-- [80%] (Action)    : SendRoomChat()
          +-- [15%] (Action)    : SendLeaveRoomReq()
