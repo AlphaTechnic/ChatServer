@@ -1,4 +1,4 @@
-#include <iostream>
+ï»¿#include <iostream>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <thread>
@@ -6,41 +6,39 @@
 #include <string>
 #include <memory>       // for std::unique_ptr
 #include <atomic>       // for std::atomic
-#include <mutex>        // for std::mutex (·Î±ë¿ë)
+#include <mutex>        // for std::mutex (ë¡œê¹…ìš©)
 #include <random>       // for std::mt19937
 #include <chrono>       // for std::this_thread::sleep_for
 #include <numeric>      // for std::iota
 
-#include "Protocol.h" // °øÅë ÇÁ·ÎÅäÄİ Çì´õ
+#include "Protocol.h" // ê³µí†µ í”„ë¡œí† ì½œ í—¤ë”
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define SERVER_IP "127.0.0.1" // ¼­¹ö IP
+// --- ì „ì—­ ë³€ìˆ˜ ë° ìœ í‹¸ë¦¬í‹° ---
 
-// --- Àü¿ª º¯¼ö ¹× À¯Æ¿¸®Æ¼ ---
-
-// ½º·¹µå ¾ÈÀüÇÑ ·Î±ëÀ» À§ÇÑ ¹ÂÅØ½º
+// ìŠ¤ë ˆë“œ ì•ˆì „í•œ ë¡œê¹…ì„ ìœ„í•œ ë®¤í…ìŠ¤
 std::mutex g_logMutex;
 
-// ½º·¹µå ¾ÈÀüÇÑ ÄÜ¼Ö Ãâ·Â
-void Log(const std::string& message)
+// ìŠ¤ë ˆë“œ ì•ˆì „í•œ ì½˜ì†” ì¶œë ¥
+static void Log(const std::string& message)
 {
     std::lock_guard<std::mutex> lock(g_logMutex);
     std::cout << message << std::endl;
 }
 
-// °¢ ½º·¹µåº°·Î µ¶¸³ÀûÀÎ ³­¼ö »ı¼º±â
+// ê° ìŠ¤ë ˆë“œë³„ë¡œ ë…ë¦½ì ì¸ ë‚œìˆ˜ ìƒì„±ê¸°
 thread_local std::mt19937 g_rng(std::random_device{}() + static_cast<unsigned int>(std::hash<std::thread::id>{}(std::this_thread::get_id())));
 
-// ¹üÀ§ ³» Á¤¼ö ³­¼ö »ı¼º
-int GetRandomInt(int min, int max)
+// ë²”ìœ„ ë‚´ ì •ìˆ˜ ë‚œìˆ˜ ìƒì„±
+static int GetRandomInt(int min, int max)
 {
     std::uniform_int_distribution<int> dist(min, max);
     return dist(g_rng);
 }
 
-// ¹üÀ§ ³» ½Ç¼ö ³­¼ö »ı¼º (È®·ü¿ë)
-double GetRandomDouble(double min, double max)
+// ë²”ìœ„ ë‚´ ì‹¤ìˆ˜ ë‚œìˆ˜ ìƒì„± (í™•ë¥ ìš©)
+static double GetRandomDouble(double min, double max)
 {
     std::uniform_real_distribution<double> dist(min, max);
     return dist(g_rng);
@@ -48,28 +46,28 @@ double GetRandomDouble(double min, double max)
 
 
 // =======================================================================
-// 1. º¿(Bot) Å¬·¡½º ¹× »óÅÂ Á¤ÀÇ
+// 1. ë´‡(Bot) í´ë˜ìŠ¤ ë° ìƒíƒœ ì •ì˜
 // =======================================================================
 
-// º¿ÀÇ Çàµ¿ Æ®¸® ³ëµå°¡ ¹İÈ¯ÇÒ »óÅÂ
+// ë´‡ì˜ í–‰ë™ íŠ¸ë¦¬ ë…¸ë“œê°€ ë°˜í™˜í•  ìƒíƒœ
 enum class NodeStatus
 {
     Success,
     Failure
 };
 
-// º¿ÀÇ ÇöÀç »óÅÂ
+// ë´‡ì˜ í˜„ì¬ ìƒíƒœ
 enum class BotState
 {
-    Dead,           // (ÃÊ±â »óÅÂ)
-    Disconnected,   // ¼­¹ö Á¢¼Ó ½Ãµµ Áß
-    Connected,      // Á¢¼Ó ¿Ï·á, ·Î±×ÀÎ Àü
-    InLobby,        // ·Î±×ÀÎ ¿Ï·á, ·Îºñ
-    InRoom          // ¹æ¿¡ ÀÔÀåÇÑ »óÅÂ
+    Dead,           // (ì´ˆê¸° ìƒíƒœ)
+    Disconnected,   // ì„œë²„ ì ‘ì† ì‹œë„ ì¤‘
+    Connected,      // ì ‘ì† ì™„ë£Œ, ë¡œê·¸ì¸ ì „
+    InLobby,        // ë¡œê·¸ì¸ ì™„ë£Œ, ë¡œë¹„
+    InRoom          // ë°©ì— ì…ì¥í•œ ìƒíƒœ
 };
 
-// º¿ÀÇ ¸ğµç Çàµ¿ Æ®¸®¸¦ ±¸¼ºÇÒ ±âº» ³ëµå (Interface)
-class Bot; // Àü¹æ ¼±¾ğ
+// ë´‡ì˜ ëª¨ë“  í–‰ë™ íŠ¸ë¦¬ë¥¼ êµ¬ì„±í•  ê¸°ë³¸ ë…¸ë“œ (Interface)
+class Bot; // ì „ë°© ì„ ì–¸
 class Node
 {
 public:
@@ -78,10 +76,10 @@ public:
 };
 
 // =======================================================================
-// 2. Çàµ¿ Æ®¸®(BT) ÇÁ·¹ÀÓ¿öÅ© ±¸Çö
+// 2. í–‰ë™ íŠ¸ë¦¬(BT) í”„ë ˆì„ì›Œí¬ êµ¬í˜„
 // =======================================================================
 
-// --- 2-1. Composite Nodes (ÀÚ½Ä ³ëµå¸¦ °¡Áö´Â ³ëµå) ---
+// --- 2-1. Composite Nodes (ìì‹ ë…¸ë“œë¥¼ ê°€ì§€ëŠ” ë…¸ë“œ) ---
 
 class CompositeNode : public Node
 {
@@ -96,7 +94,7 @@ protected:
 };
 
 /**
- * @brief (Selector ³ëµå - 'OR' ¿¬»ê)
+ * @brief (Selector ë…¸ë“œ - 'OR' ì—°ì‚°)
  */
 class Selector : public CompositeNode
 {
@@ -115,7 +113,7 @@ public:
 };
 
 /**
- * @brief (Sequence ³ëµå - 'AND' ¿¬»ê)
+ * @brief (Sequence ë…¸ë“œ - 'AND' ì—°ì‚°)
  */
 class Sequence : public CompositeNode
 {
@@ -135,12 +133,12 @@ public:
 
 
 /**
- * @brief (Probabilistic Selector ³ëµå - 'È®·üÀû OR' ¿¬»ê)
+ * @brief (Probabilistic Selector ë…¸ë“œ - 'í™•ë¥ ì  OR' ì—°ì‚°)
  */
 class ProbabilisticSelector : public CompositeNode
 {
 public:
-    // °¡ÁßÄ¡¿Í ÇÔ²² ÀÚ½Ä Ãß°¡
+    // ê°€ì¤‘ì¹˜ì™€ í•¨ê»˜ ìì‹ ì¶”ê°€
     void AddChild(std::unique_ptr<Node> child, double weight)
     {
         CompositeNode::AddChild(std::move(child));
@@ -173,7 +171,7 @@ public:
             currentSum += m_weights[i];
             if (roll < currentSum)
             {
-                return m_children[i]->Tick(bot); // ¼±ÅÃµÈ ÀÚ½Ä ½ÇÇà
+                return m_children[i]->Tick(bot); // ì„ íƒëœ ìì‹ ì‹¤í–‰
             }
         }
         return m_children.back()->Tick(bot);
@@ -184,35 +182,35 @@ private:
 };
 
 
-// --- 2-2. Leaf Nodes (½ÇÁ¦ Çàµ¿/Á¶°Ç ³ëµå) ---
+// --- 2-2. Leaf Nodes (ì‹¤ì œ í–‰ë™/ì¡°ê±´ ë…¸ë“œ) ---
 
-// (Condition) º¿ÀÌ Æ¯Á¤ »óÅÂÀÎÁö È®ÀÎ
+// (Condition) ë´‡ì´ íŠ¹ì • ìƒíƒœì¸ì§€ í™•ì¸
 class Cond_IsState : public Node
 {
 public:
     Cond_IsState(BotState targetState) : m_targetState(targetState) {}
 
-    virtual NodeStatus Tick(Bot* bot) override; // Bot Å¬·¡½º Á¤ÀÇ ÈÄ ±¸Çö
+    virtual NodeStatus Tick(Bot* bot) override; // Bot í´ë˜ìŠ¤ ì •ì˜ í›„ êµ¬í˜„
 
 private:
     BotState m_targetState;
 };
 
-// (Action) ¼­¹ö¿¡ Á¢¼Ó ½Ãµµ
+// (Action) ì„œë²„ì— ì ‘ì† ì‹œë„
 class Act_TryConnect : public Node
 {
 public:
     virtual NodeStatus Tick(Bot* bot) override;
 };
 
-// (Action) ·Î±×ÀÎ ÆĞÅ¶ Àü¼Û
+// (Action) ë¡œê·¸ì¸ íŒ¨í‚· ì „ì†¡
 class Act_SendLogin : public Node
 {
 public:
     virtual NodeStatus Tick(Bot* bot) override;
 };
 
-// (Action) (·Îºñ/¹æ) Ã¤ÆÃ Àü¼Û
+// (Action) (ë¡œë¹„/ë°©) ì±„íŒ… ì „ì†¡
 class Act_SendChat : public Node
 {
 public:
@@ -222,29 +220,29 @@ private:
     bool m_isLobbyChat;
 };
 
-// (Action) ¹æ »ı¼º ¿äÃ»
+// (Action) ë°© ìƒì„± ìš”ì²­
 class Act_SendCreateRoom : public Node
 {
 public:
     virtual NodeStatus Tick(Bot* bot) override;
 };
 
-// [¾÷µ¥ÀÌÆ®]
-// (Action) ·£´ı ¹æ ÀÔÀå ¿äÃ» (¼­¹ö¿¡ ¸ÅÄª ¿äÃ»)
+// [ì—…ë°ì´íŠ¸]
+// (Action) ëœë¤ ë°© ì…ì¥ ìš”ì²­ (ì„œë²„ì— ë§¤ì¹­ ìš”ì²­)
 class Act_SendEnterRandomRoom : public Node
 {
 public:
     virtual NodeStatus Tick(Bot* bot) override;
 };
 
-// (Action) ¹æ ÅğÀå ¿äÃ»
+// (Action) ë°© í‡´ì¥ ìš”ì²­
 class Act_SendLeaveRoom : public Node
 {
 public:
     virtual NodeStatus Tick(Bot* bot) override;
 };
 
-// (Action) ·£´ı ½Ã°£ µ¿¾È ´ë±â
+// (Action) ëœë¤ ì‹œê°„ ë™ì•ˆ ëŒ€ê¸°
 class Act_Wait : public Node
 {
 public:
@@ -260,7 +258,7 @@ private:
     int m_minMs, m_maxMs;
 };
 
-// (Action) ¾Æ¹«°Íµµ ¾È ÇÔ (Idle)
+// (Action) ì•„ë¬´ê²ƒë„ ì•ˆ í•¨ (Idle)
 class Act_DoNothing : public Node
 {
 public:
@@ -272,7 +270,7 @@ public:
 
 
 // =======================================================================
-// 3. º¿(Bot) Å¬·¡½º ±¸Çö
+// 3. ë´‡(Bot) í´ë˜ìŠ¤ êµ¬í˜„
 // =======================================================================
 
 class Bot
@@ -294,20 +292,20 @@ public:
         Stop();
     }
 
-    // --- º¿ ¸ŞÀÎ ·ÎÁ÷ (½º·¹µå ÁøÀÔÁ¡) ---
+    // --- ë´‡ ë©”ì¸ ë¡œì§ (ìŠ¤ë ˆë“œ ì§„ì…ì ) ---
     void Run()
     {
         m_isRunning = true;
         m_state.store(BotState::Disconnected);
 
-        // 1. Çàµ¿ Æ®¸® ±¸¼º
+        // 1. í–‰ë™ íŠ¸ë¦¬ êµ¬ì„±
         BuildBehaviorTree();
 
-        // 2. ¼ö½Å ½º·¹µå ½ÃÀÛ
+        // 2. ìˆ˜ì‹  ìŠ¤ë ˆë“œ ì‹œì‘
         std::thread recvTh(&Bot::RecvThread, this);
         recvTh.detach();
 
-        // 3. BT Tick ¸ŞÀÎ ·çÇÁ (º¿ÀÇ 'ÀÇÁö' ´ã´ç)
+        // 3. BT Tick ë©”ì¸ ë£¨í”„ (ë´‡ì˜ 'ì˜ì§€' ë‹´ë‹¹)
         while (m_isRunning.load())
         {
             if (m_behaviorTree)
@@ -315,15 +313,15 @@ public:
                 m_behaviorTree->Tick(this);
             }
 
-            // º¿ÀÇ Çàµ¿ ÁÖ±â
-            int thinkTime = GetRandomInt(500, 2000); // 0.5ÃÊ ~ 2ÃÊ
+            // ë´‡ì˜ í–‰ë™ ì£¼ê¸°
+            int thinkTime = GetRandomInt(500, 2000); // 0.5ì´ˆ ~ 2ì´ˆ
             std::this_thread::sleep_for(std::chrono::milliseconds(thinkTime));
         }
 
         Log("[" + m_userID + "] Bot logic loop stopped.");
     }
 
-    // --- º¿ Á¾·á ---
+    // --- ë´‡ ì¢…ë£Œ ---
     void Stop()
     {
         if (!m_isRunning.exchange(false))
@@ -338,9 +336,9 @@ public:
     }
 
 
-    // --- ³×Æ®¿öÅ© °ü·Ã ---
+    // --- ë„¤íŠ¸ì›Œí¬ ê´€ë ¨ ---
 
-    // (BT Action¿ë) ¼­¹ö Á¢¼Ó
+    // (BT Actionìš©) ì„œë²„ ì ‘ì†
     bool TryConnect()
     {
         if (m_socket != INVALID_SOCKET)
@@ -374,7 +372,7 @@ public:
         return true;
     }
 
-    // (BT Action¿ë) ÆĞÅ¶ Àü¼Û
+    // (BT Actionìš©) íŒ¨í‚· ì „ì†¡
     void SendPacket(char* pPacket, int size)
     {
         if (m_socket == INVALID_SOCKET || !m_isRunning.load())
@@ -389,14 +387,14 @@ public:
         }
     }
 
-    // --- »óÅÂ Á¢±ÙÀÚ (Thread-safe) ---
+    // --- ìƒíƒœ ì ‘ê·¼ì (Thread-safe) ---
     BotState GetState() { return m_state.load(); }
     int GetRoomID() { return m_currentRoomID.load(); }
     const std::string& GetUserID() { return m_userID; }
 
 
 private:
-    // (Recv ½º·¹µå)
+    // (Recv ìŠ¤ë ˆë“œ)
     void RecvThread()
     {
         char recvBuffer[MAX_BUFFER_SIZE];
@@ -426,7 +424,7 @@ private:
                 continue;
             }
 
-            // ÆĞÅ¶ ÆÄ½Ì ·ÎÁ÷
+            // íŒ¨í‚· íŒŒì‹± ë¡œì§
             memcpy(m_packetBuffer + m_currentPacketSize, recvBuffer, nRecv);
             m_currentPacketSize += nRecv;
 
@@ -453,7 +451,7 @@ private:
         Log("[" + m_userID + "] Recv thread stopped.");
     }
 
-    // (Recv ½º·¹µå) ¼ö½ÅµÈ ÆĞÅ¶ Ã³¸®
+    // (Recv ìŠ¤ë ˆë“œ) ìˆ˜ì‹ ëœ íŒ¨í‚· ì²˜ë¦¬
     void ProcessPacket(char* pPacketData)
     {
         PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(pPacketData);
@@ -465,12 +463,12 @@ private:
             PktLoginRes* pRes = reinterpret_cast<PktLoginRes*>(pPacketData);
             if (pRes->success)
             {
-                Log("[" + m_userID + "] ·Î±×ÀÎ ¼º°ø -> InLobby");
+                Log("[" + m_userID + "] ë¡œê·¸ì¸ ì„±ê³µ -> InLobby");
                 m_state.store(BotState::InLobby);
             }
             else
             {
-                Log("[" + m_userID + "] ·Î±×ÀÎ ½ÇÆĞ");
+                Log("[" + m_userID + "] ë¡œê·¸ì¸ ì‹¤íŒ¨");
             }
             break;
         }
@@ -479,32 +477,32 @@ private:
             PktCreateRoomRes* pRes = reinterpret_cast<PktCreateRoomRes*>(pPacketData);
             if (pRes->success)
             {
-                Log("[" + m_userID + "] ¹æ »ı¼º ¼º°ø (Room " + std::to_string(pRes->newRoomID) + ") -> InRoom");
+                Log("[" + m_userID + "] ë°© ìƒì„± ì„±ê³µ (Room " + std::to_string(pRes->newRoomID) + ") -> InRoom");
                 m_currentRoomID.store(pRes->newRoomID);
                 m_state.store(BotState::InRoom);
             }
             else
             {
-                Log("[" + m_userID + "] ¹æ »ı¼º ½ÇÆĞ");
+                Log("[" + m_userID + "] ë°© ìƒì„± ì‹¤íŒ¨");
             }
             break;
         }
-        // [¾÷µ¥ÀÌÆ®]
-        // ·£´ı ÀÔÀåÀÌµç, ÁöÁ¤ ÀÔÀåÀÌµç ¼­¹ö´Â PktEnterRoomRes·Î ÀÀ´äÇÔ
-        // µû¶ó¼­ ÀÌ ·ÎÁ÷Àº ¼öÁ¤ÇÒ ÇÊ¿ä°¡ ¾øÀ½ (¼­¹öÀÇ ÀÀ´äÀ» ±×´ë·Î Ã³¸®)
+        // [ì—…ë°ì´íŠ¸]
+        // ëœë¤ ì…ì¥ì´ë“ , ì§€ì • ì…ì¥ì´ë“  ì„œë²„ëŠ” PktEnterRoomResë¡œ ì‘ë‹µí•¨
+        // ë”°ë¼ì„œ ì´ ë¡œì§ì€ ìˆ˜ì •í•  í•„ìš”ê°€ ì—†ìŒ (ì„œë²„ì˜ ì‘ë‹µì„ ê·¸ëŒ€ë¡œ ì²˜ë¦¬)
         case PacketType::EnterRoomRes:
         {
             PktEnterRoomRes* pRes = reinterpret_cast<PktEnterRoomRes*>(pPacketData);
             if (pRes->success)
             {
-                Log("[" + m_userID + "] ¹æ ÀÔÀå ¼º°ø (Room " + std::to_string(pRes->roomID) + ") -> InRoom");
+                Log("[" + m_userID + "] ë°© ì…ì¥ ì„±ê³µ (Room " + std::to_string(pRes->roomID) + ") -> InRoom");
                 m_currentRoomID.store(pRes->roomID);
                 m_state.store(BotState::InRoom);
             }
             else
             {
-                // (PktEnterRandomRoomReq¿¡ ´ëÇÑ ½ÇÆĞ ÀÀ´äµµ ¿©±â·Î ¿È)
-                Log("[" + m_userID + "] ¹æ ÀÔÀå ½ÇÆĞ (¹æÀÌ ¾ø°Å³ª/²Ë Ã¡°Å³ª/ÀÔÀå °¡´ÉÇÑ ¹æ ¾øÀ½)");
+                // (PktEnterRandomRoomReqì— ëŒ€í•œ ì‹¤íŒ¨ ì‘ë‹µë„ ì—¬ê¸°ë¡œ ì˜´)
+                Log("[" + m_userID + "] ë°© ì…ì¥ ì‹¤íŒ¨ (ë°©ì´ ì—†ê±°ë‚˜/ê½‰ ì°¼ê±°ë‚˜/ì…ì¥ ê°€ëŠ¥í•œ ë°© ì—†ìŒ)");
             }
             break;
         }
@@ -513,7 +511,7 @@ private:
             PktLeaveRoomRes* pRes = reinterpret_cast<PktLeaveRoomRes*>(pPacketData);
             if (pRes->success)
             {
-                Log("[" + m_userID + "] ¹æ ÅğÀå ¼º°ø -> InLobby");
+                Log("[" + m_userID + "] ë°© í‡´ì¥ ì„±ê³µ -> InLobby");
                 m_currentRoomID.store(LOBBY_ID);
                 m_state.store(BotState::InLobby);
             }
@@ -523,7 +521,7 @@ private:
         case PacketType::UserEnterNtf:
         case PacketType::UserLeaveNtf:
         case PacketType::UserListNtf:
-            // º¿Àº ´Ù¸¥ À¯Àú Á¤º¸³ª Ã¤ÆÃ ¼ö½ÅÀ» ¹«½Ã
+            // ë´‡ì€ ë‹¤ë¥¸ ìœ ì € ì •ë³´ë‚˜ ì±„íŒ… ìˆ˜ì‹ ì„ ë¬´ì‹œ
             break;
 
         default:
@@ -532,53 +530,53 @@ private:
     }
 
 
-    // --- Çàµ¿ Æ®¸® ±¸¼º ---
+    // --- í–‰ë™ íŠ¸ë¦¬ êµ¬ì„± ---
     void BuildBehaviorTree()
     {
-        // ÃÖ»óÀ§ ·çÆ®
+        // ìµœìƒìœ„ ë£¨íŠ¸
         auto root = std::make_unique<Selector>();
 
-        // 1. (Disconnected »óÅÂ) -> Á¢¼Ó ½Ãµµ
+        // 1. (Disconnected ìƒíƒœ) -> ì ‘ì† ì‹œë„
         auto seqConnect = std::make_unique<Sequence>();
         seqConnect->AddChild(std::make_unique<Cond_IsState>(BotState::Disconnected));
         seqConnect->AddChild(std::make_unique<Act_TryConnect>());
         root->AddChild(std::move(seqConnect));
 
-        // 2. (Connected »óÅÂ) -> ·Î±×ÀÎ ½Ãµµ
+        // 2. (Connected ìƒíƒœ) -> ë¡œê·¸ì¸ ì‹œë„
         auto seqLogin = std::make_unique<Sequence>();
         seqLogin->AddChild(std::make_unique<Cond_IsState>(BotState::Connected));
         seqLogin->AddChild(std::make_unique<Act_SendLogin>());
         root->AddChild(std::move(seqLogin));
 
-        // 3. (InLobby »óÅÂ) -> ·Îºñ Çàµ¿ °áÁ¤
+        // 3. (InLobby ìƒíƒœ) -> ë¡œë¹„ í–‰ë™ ê²°ì •
         auto seqLobby = std::make_unique<Sequence>();
         seqLobby->AddChild(std::make_unique<Cond_IsState>(BotState::InLobby));
-        seqLobby->AddChild(std::make_unique<Act_Wait>(1000, 3000)); // Çàµ¿ Àü 1~3ÃÊ ´ë±â
+        seqLobby->AddChild(std::make_unique<Act_Wait>(1000, 3000)); // í–‰ë™ ì „ 1~3ì´ˆ ëŒ€ê¸°
 
-        auto probLobby = std::make_unique<ProbabilisticSelector>(); // È®·ü ³ëµå
-        probLobby->AddChild(std::make_unique<Act_SendChat>(true), 70.0); // 70% ·Îºñ Ã¤ÆÃ
-        probLobby->AddChild(std::make_unique<Act_SendCreateRoom>(), 15.0); // 15% ¹æ »ı¼º
-        // [¾÷µ¥ÀÌÆ®] Act_SendEnterRoom -> Act_SendEnterRandomRoom
-        probLobby->AddChild(std::make_unique<Act_SendEnterRandomRoom>(), 10.0); // 10% ·£´ı ¹æ ÀÔÀå
-        probLobby->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% ¾Æ¹«°Íµµ ¾ÈÇÔ
+        auto probLobby = std::make_unique<ProbabilisticSelector>(); // í™•ë¥  ë…¸ë“œ
+        probLobby->AddChild(std::make_unique<Act_SendChat>(true), 70.0); // 70% ë¡œë¹„ ì±„íŒ…
+        probLobby->AddChild(std::make_unique<Act_SendCreateRoom>(), 15.0); // 15% ë°© ìƒì„±
+        // [ì—…ë°ì´íŠ¸] Act_SendEnterRoom -> Act_SendEnterRandomRoom
+        probLobby->AddChild(std::make_unique<Act_SendEnterRandomRoom>(), 10.0); // 10% ëœë¤ ë°© ì…ì¥
+        probLobby->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% ì•„ë¬´ê²ƒë„ ì•ˆí•¨
 
         seqLobby->AddChild(std::move(probLobby));
         root->AddChild(std::move(seqLobby));
 
-        // 4. (InRoom »óÅÂ) -> ¹æ Çàµ¿ °áÁ¤
+        // 4. (InRoom ìƒíƒœ) -> ë°© í–‰ë™ ê²°ì •
         auto seqRoom = std::make_unique<Sequence>();
         seqRoom->AddChild(std::make_unique<Cond_IsState>(BotState::InRoom));
-        seqRoom->AddChild(std::make_unique<Act_Wait>(1000, 5000)); // Çàµ¿ Àü 1~5ÃÊ ´ë±â
+        seqRoom->AddChild(std::make_unique<Act_Wait>(1000, 5000)); // í–‰ë™ ì „ 1~5ì´ˆ ëŒ€ê¸°
 
-        auto probRoom = std::make_unique<ProbabilisticSelector>(); // È®·ü ³ëµå
-        probRoom->AddChild(std::make_unique<Act_SendChat>(false), 80.0); // 80% ¹æ Ã¤ÆÃ
-        probRoom->AddChild(std::make_unique<Act_SendLeaveRoom>(), 15.0); // 15% ¹æ ³ª°¡±â
-        probRoom->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% ¾Æ¹«°Íµµ ¾ÈÇÔ
+        auto probRoom = std::make_unique<ProbabilisticSelector>(); // í™•ë¥  ë…¸ë“œ
+        probRoom->AddChild(std::make_unique<Act_SendChat>(false), 80.0); // 80% ë°© ì±„íŒ…
+        probRoom->AddChild(std::make_unique<Act_SendLeaveRoom>(), 15.0); // 15% ë°© ë‚˜ê°€ê¸°
+        probRoom->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% ì•„ë¬´ê²ƒë„ ì•ˆí•¨
 
         seqRoom->AddChild(std::move(probRoom));
         root->AddChild(std::move(seqRoom));
 
-        // 5. Æ®¸®¸¦ º¿¿¡ ÀåÂø
+        // 5. íŠ¸ë¦¬ë¥¼ ë´‡ì— ì¥ì°©
         m_behaviorTree = std::move(root);
     }
 
@@ -591,17 +589,17 @@ private:
     std::atomic<int> m_currentRoomID;
     std::atomic<bool> m_isRunning;
 
-    // (Recv ½º·¹µå Àü¿ë)
+    // (Recv ìŠ¤ë ˆë“œ ì „ìš©)
     char m_packetBuffer[MAX_BUFFER_SIZE * 2];
     int m_currentPacketSize;
 
-    // (Run ½º·¹µå Àü¿ë)
+    // (Run ìŠ¤ë ˆë“œ ì „ìš©)
     std::unique_ptr<Node> m_behaviorTree;
 };
 
 
 // =======================================================================
-// 4. BT Leaf Nodes ±¸Çö (Bot Å¬·¡½º Á¤ÀÇ ÀÌÈÄ)
+// 4. BT Leaf Nodes êµ¬í˜„ (Bot í´ë˜ìŠ¤ ì •ì˜ ì´í›„)
 // =======================================================================
 
 NodeStatus Cond_IsState::Tick(Bot* bot)
@@ -611,13 +609,13 @@ NodeStatus Cond_IsState::Tick(Bot* bot)
 
 NodeStatus Act_TryConnect::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) ¼­¹ö Á¢¼Ó ½Ãµµ...");
+    Log("[" + bot->GetUserID() + "] (Action) ì„œë²„ ì ‘ì† ì‹œë„...");
     return bot->TryConnect() ? NodeStatus::Success : NodeStatus::Failure;
 }
 
 NodeStatus Act_SendLogin::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) ·Î±×ÀÎ ¿äÃ» Àü¼Û");
+    Log("[" + bot->GetUserID() + "] (Action) ë¡œê·¸ì¸ ìš”ì²­ ì „ì†¡");
 
     PktLoginReq req;
     req.packetLength = sizeof(req);
@@ -630,12 +628,12 @@ NodeStatus Act_SendLogin::Tick(Bot* bot)
 
 NodeStatus Act_SendChat::Tick(Bot* bot)
 {
-    std::string msg = "¾È³çÇÏ¼¼¿ä! (º¿ ¸Ş½ÃÁö #" + std::to_string(GetRandomInt(0, 999)) + ")";
+    std::string msg = "ì•ˆë…•í•˜ì„¸ìš”! (ë´‡ ë©”ì‹œì§€ #" + std::to_string(GetRandomInt(0, 999)) + ")";
 
     if (m_isLobbyChat)
-        Log("[" + bot->GetUserID() + "] (Action) ·Îºñ Ã¤ÆÃ Àü¼Û: " + msg);
+        Log("[" + bot->GetUserID() + "] (Action) ë¡œë¹„ ì±„íŒ… ì „ì†¡: " + msg);
     else
-        Log("[" + bot->GetUserID() + "] (Action) ¹æ Ã¤ÆÃ Àü¼Û: " + msg);
+        Log("[" + bot->GetUserID() + "] (Action) ë°© ì±„íŒ… ì „ì†¡: " + msg);
 
     PktChatReq req;
     req.packetLength = sizeof(req);
@@ -648,7 +646,7 @@ NodeStatus Act_SendChat::Tick(Bot* bot)
 
 NodeStatus Act_SendCreateRoom::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) ¹æ »ı¼º ¿äÃ»");
+    Log("[" + bot->GetUserID() + "] (Action) ë°© ìƒì„± ìš”ì²­");
 
     PktCreateRoomReq req;
     req.packetLength = sizeof(req);
@@ -658,10 +656,10 @@ NodeStatus Act_SendCreateRoom::Tick(Bot* bot)
     return NodeStatus::Success;
 }
 
-// [¾÷µ¥ÀÌÆ®]
+// [ì—…ë°ì´íŠ¸]
 NodeStatus Act_SendEnterRandomRoom::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) ·£´ı ¹æ ÀÔÀå ¿äÃ»");
+    Log("[" + bot->GetUserID() + "] (Action) ëœë¤ ë°© ì…ì¥ ìš”ì²­");
 
     PktEnterRandomRoomReq req;
     req.packetLength = sizeof(req);
@@ -673,7 +671,7 @@ NodeStatus Act_SendEnterRandomRoom::Tick(Bot* bot)
 
 NodeStatus Act_SendLeaveRoom::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) ¹æ ÅğÀå ¿äÃ»");
+    Log("[" + bot->GetUserID() + "] (Action) ë°© í‡´ì¥ ìš”ì²­");
 
     PktLeaveRoomReq req;
     req.packetLength = sizeof(req);
@@ -685,12 +683,12 @@ NodeStatus Act_SendLeaveRoom::Tick(Bot* bot)
 
 
 // =======================================================================
-// 5. ¸ŞÀÎ ÇÔ¼ö (½Ã¹Ä·¹ÀÌÅÍ ½ÃÀÛ)
+// 5. ë©”ì¸ í•¨ìˆ˜ (ì‹œë®¬ë ˆì´í„° ì‹œì‘)
 // =======================================================================
 
 int main()
 {
-    // 1. Winsock ÃÊ±âÈ­
+    // 1. Winsock ì´ˆê¸°í™”
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
@@ -701,12 +699,12 @@ int main()
     int botCount = 0;
     while (botCount <= 0 || botCount > 1000)
     {
-        std::cout << "»ı¼ºÇÒ º¿ÀÇ ¼ö(N)¸¦ ÀÔ·ÂÇÏ¼¼¿ä (1 ~ 1000): ";
+        std::cout << "ìƒì„±í•  ë´‡ì˜ ìˆ˜(N)ë¥¼ ì…ë ¥í•˜ì„¸ìš” (1 ~ 1000): ";
         std::cin >> botCount;
     }
-    std::cin.ignore(); // (Enter Å° ¹öÆÛ ºñ¿ì±â)
+    std::cin.ignore(); // (Enter í‚¤ ë²„í¼ ë¹„ìš°ê¸°)
 
-    // 2. º¿ °´Ã¼ ¹× ½º·¹µå »ı¼º
+    // 2. ë´‡ ê°ì²´ ë° ìŠ¤ë ˆë“œ ìƒì„±
     std::vector<std::unique_ptr<Bot>> bots;
     std::vector<std::thread> botThreads;
 
@@ -716,31 +714,31 @@ int main()
         bots.push_back(std::make_unique<Bot>(botID));
     }
 
-    Log("--- " + std::to_string(botCount) + "°³ÀÇ º¿ ½º·¹µå¸¦ ½ÃÀÛÇÕ´Ï´Ù... ---");
+    Log("--- " + std::to_string(botCount) + "ê°œì˜ ë´‡ ìŠ¤ë ˆë“œë¥¼ ì‹œì‘í•©ë‹ˆë‹¤... ---");
 
-    // 3. º¿ ½º·¹µå ½ÃÀÛ
+    // 3. ë´‡ ìŠ¤ë ˆë“œ ì‹œì‘
     for (auto& bot : bots)
     {
         botThreads.emplace_back(&Bot::Run, bot.get());
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // (Á¢¼Ó ºÎÇÏ ºĞ»ê)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // (ì ‘ì† ë¶€í•˜ ë¶„ì‚°)
     }
 
-    // 4. ¸ŞÀÎ ½º·¹µå ´ë±â (Á¾·á)
-    std::cout << "\n--- ¸ğµç º¿ÀÌ ½ÃÀÛµÇ¾ú½À´Ï´Ù. ---" << std::endl;
-    std::cout << "--- ¼­¹ö ºÎÇÏ Å×½ºÆ® Áß... ---" << std::endl;
-    std::cout << "--- Á¾·áÇÏ·Á¸é Enter Å°¸¦ ´©¸£¼¼¿ä. ---" << std::endl;
+    // 4. ë©”ì¸ ìŠ¤ë ˆë“œ ëŒ€ê¸° (ì¢…ë£Œ)
+    std::cout << "\n--- ëª¨ë“  ë´‡ì´ ì‹œì‘ë˜ì—ˆìŠµë‹ˆë‹¤. ---" << std::endl;
+    std::cout << "--- ì„œë²„ ë¶€í•˜ í…ŒìŠ¤íŠ¸ ì¤‘... ---" << std::endl;
+    std::cout << "--- ì¢…ë£Œí•˜ë ¤ë©´ Enter í‚¤ë¥¼ ëˆ„ë¥´ì„¸ìš”. ---" << std::endl;
 
     std::string input;
     std::getline(std::cin, input);
 
-    // 5. Á¾·á Ã³¸®
-    Log("--- º¿ Á¾·á ½ÅÈ£ Àü¼Û Áß... ---");
+    // 5. ì¢…ë£Œ ì²˜ë¦¬
+    Log("--- ë´‡ ì¢…ë£Œ ì‹ í˜¸ ì „ì†¡ ì¤‘... ---");
     for (auto& bot : bots)
     {
         bot->Stop();
     }
 
-    Log("--- ¸ğµç º¿ ½º·¹µå°¡ Á¾·áµÇ±â¸¦ ±â´Ù¸®´Â Áß... ---");
+    Log("--- ëª¨ë“  ë´‡ ìŠ¤ë ˆë“œê°€ ì¢…ë£Œë˜ê¸°ë¥¼ ê¸°ë‹¤ë¦¬ëŠ” ì¤‘... ---");
     for (auto& th : botThreads)
     {
         if (th.joinable())
@@ -749,9 +747,9 @@ int main()
         }
     }
 
-    Log("--- ¸ğµç º¿ÀÌ Á¾·áµÇ¾ú½À´Ï´Ù. ---");
+    Log("--- ëª¨ë“  ë´‡ì´ ì¢…ë£Œë˜ì—ˆìŠµë‹ˆë‹¤. ---");
 
-    // 6. Winsock Á¤¸®
+    // 6. Winsock ì •ë¦¬
     WSACleanup();
     return 0;
 }

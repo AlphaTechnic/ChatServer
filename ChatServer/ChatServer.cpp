@@ -142,7 +142,7 @@ public:
 		}
 	}
 
-	int GetID() { return m_roomID; }
+	int GetID() const { return m_roomID; }
 	int GetUserCount() {
 		std::lock_guard<std::mutex> lock(m_mutex);
 		return static_cast<int>(m_sessions.size());
@@ -315,7 +315,7 @@ std::mutex g_dbMutex; // g_chatLogDB 접근 제어를 위한 뮤텍스
 /**
  * @brief 채팅 메시지를 인메모리 DB에 저장 (스레드 안전)
  */
-void LogChatMessage(int roomID, const std::string& userID, const std::string& message)
+static void LogChatMessage(int roomID, const std::string& userID, const std::string& message)
 {
 	std::lock_guard<std::mutex> lock(g_dbMutex); // (중요) DB 접근 잠금
 
@@ -333,7 +333,7 @@ void LogChatMessage(int roomID, const std::string& userID, const std::string& me
 /**
  * @brief [요구사항] 7일이 지난 오래된 로그를 삭제합니다. (스레드 안전)
  */
-void CleanupOldChatLogs()
+static void CleanupOldChatLogs()
 {
 	std::cout << "[DB] Running cleanup for logs older than 7 days..." << std::endl;
 
@@ -586,7 +586,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 /**
  * @brief (v2 추가) 수신된 데이터를 파싱하고 패킷을 조립/처리하는 함수
  */
-void ProcessRecv(Session* pSession, DWORD bytesTransferred)
+static void ProcessRecv(Session* pSession, DWORD bytesTransferred)
 {
 	// 수신한 데이터를 세션의 패킷 버퍼 뒤에 이어 붙임
 	memcpy(pSession->packetBuffer + pSession->currentPacketSize,
@@ -628,7 +628,7 @@ void ProcessRecv(Session* pSession, DWORD bytesTransferred)
 
 
 // (v2 수정) --- 워커 스레드 함수 ---
-void WorkerThread()
+static void WorkerThread()
 {
 	DWORD bytesTransferred;
 	ULONG_PTR completionKey;
@@ -756,7 +756,7 @@ void WorkerThread()
  * @brief 주기적으로 모든 세션을 검사하여 타임아웃된 세션을 정리하는 스레드
  * [In-Memory DB] DB 정리 작업도 이 스레드에서 주기적으로 수행
  */
-void TimeoutThread()
+static void TimeoutThread()
 {
 	std::cout << "[Debug] Timeout Thread " << std::this_thread::get_id() << " started." << std::endl;
 
