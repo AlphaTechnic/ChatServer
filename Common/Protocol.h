@@ -1,125 +1,133 @@
-#pragma once
+ï»¿#pragma once
 
-// --- °øÅë »ó¼ö Á¤ÀÇ ---
+// --- ê³µí†µ ìƒìˆ˜ ì •ì˜ ---
 constexpr int SERVER_PORT = 9000;
-constexpr int MAX_BUFFER_SIZE = 4096; // °øÅë ¹öÆÛ Å©±â
+constexpr int MAX_BUFFER_SIZE = 4096; // ê³µí†µ ë²„í¼ í¬ê¸°
 constexpr int MAX_ROOM_USERS = 50;
 constexpr int LOBBY_ID = -1;
 constexpr int MAX_USER_ID_LEN = 16;
 constexpr int MAX_CHAT_LEN = 128;
 
 
-// --- ÆĞÅ¶ ÇÁ·ÎÅäÄİ Á¤ÀÇ ---
-// C/C++ ÄÄÆÄÀÏ·¯°¡ ±¸Á¶Ã¼¸¦ ¸Ş¸ğ¸®¿¡ Á¤·ÄÇÒ ¶§
-// ¸â¹ö º¯¼ö »çÀÌ¿¡ ÆĞµù(ºó °ø°£)À» ³ÖÁö ¾Êµµ·Ï 1¹ÙÀÌÆ® Å©±â·Î Á¤·Ä
+// --- íŒ¨í‚· í”„ë¡œí† ì½œ ì •ì˜ ---
+// C/C++ ì»´íŒŒì¼ëŸ¬ê°€ êµ¬ì¡°ì²´ë¥¼ ë©”ëª¨ë¦¬ì— ì •ë ¬í•  ë•Œ
+// ë©¤ë²„ ë³€ìˆ˜ ì‚¬ì´ì— íŒ¨ë”©(ë¹ˆ ê³µê°„)ì„ ë„£ì§€ ì•Šë„ë¡ 1ë°”ì´íŠ¸ í¬ê¸°ë¡œ ì •ë ¬
 #pragma pack(push, 1)
 
-// ÆĞÅ¶ÀÇ Á¾·ù (¼­¹ö¿Í Å¬¶óÀÌ¾ğÆ®ÀÇ ¸ğµç Å¸ÀÔÀ» ÅëÇÕ)
+// íŒ¨í‚·ì˜ ì¢…ë¥˜ (ì„œë²„ì™€ í´ë¼ì´ì–¸íŠ¸ì˜ ëª¨ë“  íƒ€ì…ì„ í†µí•©)
 enum class PacketType : short
 {
-    // Client -> Server
-    LoginReq,
-    CreateRoomReq,
-    EnterRoomReq,
-    LeaveRoomReq,
-    ChatReq,
+	// Client -> Server
+	LoginReq,
+	CreateRoomReq,
+	EnterRoomReq,
+	LeaveRoomReq,
+	ChatReq,
+	EnterRandomRoomReq, // [ëœë¤ ì…ì¥ ì¶”ê°€]
 
-    // Server -> Client
-    LoginRes,
-    CreateRoomRes,
-    EnterRoomRes,
-    LeaveRoomRes,
-    ChatNtf,
-    UserEnterNtf,
-    UserLeaveNtf,
-    UserListNtf, // (Å¬¶óÀÌ¾ğÆ®¿¡¸¸ ÀÖ´ø Å¸ÀÔ ÅëÇÕ)
+	// Server -> Client
+	LoginRes,
+	CreateRoomRes,
+	EnterRoomRes,
+	LeaveRoomRes,
+	ChatNtf,
+	UserEnterNtf,
+	UserLeaveNtf,
+	UserListNtf, // (í´ë¼ì´ì–¸íŠ¸ì—ë§Œ ìˆë˜ íƒ€ì… í†µí•©)
 };
 
-// ¸ğµç ÆĞÅ¶ÀÇ ±âº»ÀÌ µÇ´Â Çì´õ
+// ëª¨ë“  íŒ¨í‚·ì˜ ê¸°ë³¸ì´ ë˜ëŠ” í—¤ë”
 struct PacketHeader
 {
-    short packetLength;
-    PacketType type;
+	short packetLength;
+	PacketType type;
 };
 
-// C -> S : ·Î±×ÀÎ ¿äÃ»
+// C -> S : ë¡œê·¸ì¸ ìš”ì²­
 struct PktLoginReq : public PacketHeader
 {
-    char userID[MAX_USER_ID_LEN];
+	char userID[MAX_USER_ID_LEN];
 };
 
-// S -> C : ·Î±×ÀÎ ÀÀ´ä
+// S -> C : ë¡œê·¸ì¸ ì‘ë‹µ
 struct PktLoginRes : public PacketHeader
 {
-    bool success;
+	bool success;
 };
 
-// C -> S : Ã¤ÆÃ¹æ »ı¼º ¿äÃ»
+// C -> S : ì±„íŒ…ë°© ìƒì„± ìš”ì²­
 struct PktCreateRoomReq : public PacketHeader
 {
 };
 
-// S -> C : Ã¤ÆÃ¹æ »ı¼º ÀÀ´ä
+// S -> C : ì±„íŒ…ë°© ìƒì„± ì‘ë‹µ
 struct PktCreateRoomRes : public PacketHeader
 {
-    bool success;
-    int newRoomID;
+	bool success;
+	int newRoomID;
 };
 
-// C -> S : Ã¤ÆÃ¹æ ÀÔÀå ¿äÃ»
+// C -> S : ì±„íŒ…ë°© ì…ì¥ ìš”ì²­
 struct PktEnterRoomReq : public PacketHeader
 {
-    int roomID;
+	int roomID;
 };
 
-// S -> C : Ã¤ÆÃ¹æ ÀÔÀå ÀÀ´ä
+// S -> C : ì±„íŒ…ë°© ì…ì¥ ì‘ë‹µ
 struct PktEnterRoomRes : public PacketHeader
 {
-    bool success;
-    int roomID;
+	bool success;
+	int roomID;
 };
 
-// C -> S : Ã¤ÆÃ¹æ ÅğÀå ¿äÃ»
+// C -> S : ì±„íŒ…ë°© í‡´ì¥ ìš”ì²­
 struct PktLeaveRoomReq : public PacketHeader
 {
 };
 
-// S -> C : Ã¤ÆÃ¹æ ÅğÀå ÀÀ´ä
+// S -> C : ì±„íŒ…ë°© í‡´ì¥ ì‘ë‹µ
 struct PktLeaveRoomRes : public PacketHeader
 {
-    bool success;
+	bool success;
 };
 
-// C -> S : Ã¤ÆÃ Àü¼Û
+// C -> S : ì±„íŒ… ì „ì†¡
 struct PktChatReq : public PacketHeader
 {
-    char message[MAX_CHAT_LEN];
+	char message[MAX_CHAT_LEN];
 };
 
-// S -> C : Ã¤ÆÃ ¾Ë¸² (ºê·ÎµåÄ³½ºÆÃ¿ë)
+// S -> C : ì±„íŒ… ì•Œë¦¼ (ë¸Œë¡œë“œìºìŠ¤íŒ…ìš©)
 struct PktChatNtf : public PacketHeader
 {
-    char userID[MAX_USER_ID_LEN];
-    char message[MAX_CHAT_LEN];
+	char userID[MAX_USER_ID_LEN];
+	char message[MAX_CHAT_LEN];
 };
 
-// S -> C : (·Îºñ/¹æ) »õ À¯Àú ÀÔÀå ¾Ë¸²
+// S -> C : (ë¡œë¹„/ë°©) ìƒˆ ìœ ì € ì…ì¥ ì•Œë¦¼
 struct PktUserEnterNtf : public PacketHeader
 {
-    char userID[MAX_USER_ID_LEN];
+	char userID[MAX_USER_ID_LEN];
 };
 
-// S -> C : (·Îºñ/¹æ) À¯Àú ÅğÀå ¾Ë¸²
+// S -> C : (ë¡œë¹„/ë°©) ìœ ì € í‡´ì¥ ì•Œë¦¼
 struct PktUserLeaveNtf : public PacketHeader
 {
-    char userID[MAX_USER_ID_LEN];
+	char userID[MAX_USER_ID_LEN];
 };
 
-// S -> C : (¹æ/·Îºñ) À¯Àú ¸®½ºÆ® ¾Ë¸² (Å¬¶óÀÌ¾ğÆ®¿¡¸¸ ÀÖ´ø ±¸Á¶Ã¼ ÅëÇÕ)
+// S -> C : (ë°©/ë¡œë¹„) ìœ ì € ë¦¬ìŠ¤íŠ¸ ì•Œë¦¼ (í´ë¼ì´ì–¸íŠ¸ì—ë§Œ ìˆë˜ êµ¬ì¡°ì²´ í†µí•©)
 struct PktUserListNtf : public PacketHeader
 {
-    short userCount;
-    // µÚ¿¡ char[MAX_USER_ID_LEN] * userCount ¸¸Å­ µ¥ÀÌÅÍ°¡ ºÙÀ½
+	short userCount;
+	// ë’¤ì— char[MAX_USER_ID_LEN] * userCount ë§Œí¼ ë°ì´í„°ê°€ ë¶™ìŒ
 };
+
+// [ëœë¤ ì…ì¥ ì¶”ê°€]
+// C -> S : ëœë¤ ë°© ì…ì¥ ìš”ì²­
+struct PktEnterRandomRoomReq : public PacketHeader
+{
+};
+
 
 #pragma pack(pop)
