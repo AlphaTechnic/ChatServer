@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "IocpManager.h" // IOCP, 스레드, 세션 관리
-#include "Session.h"       // new Session
+#include "Session.h"
 
 int main()
 {
