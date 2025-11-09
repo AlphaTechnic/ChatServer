@@ -9,8 +9,8 @@
 #pragma comment(lib, "ws2_32.lib")
 
 /**
- * @brief 서버로부터 받은 패킷을 처리하는 함수
- */
+ * @brief 서버로부터 받은 패킷을 처리하는 함수
+ */
 static void ProcessPacket(char* pPacketData)
 {
 	PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(pPacketData);
@@ -104,12 +104,12 @@ static void ProcessPacket(char* pPacketData)
 
 
 /**
- * @brief (Recv 스레드) 서버로부터 패킷을 수신하는 스레드
- */
+ * @brief (Recv 스레드) 서버로부터 패킷을 수신하는 스레드
+ */
 static void RecvThread(SOCKET serverSocket)
 {
 	char recvBuffer[MAX_BUFFER_SIZE]; // 서버에서 받은 원시 데이터
-	char packetBuffer[MAX_BUFFER_SIZE * 2]; // 패킷 조립용 버퍼
+	char packetBuffer[MAX_BUFFER_SIZE * 2] = { 0 ,}; // 패킷 조립용 버퍼
 	int currentPacketSize = 0;
 
 	std::cout << "[Debug] Recv thread started." << std::endl;
@@ -158,8 +158,8 @@ static void RecvThread(SOCKET serverSocket)
 
 
 /**
- * @brief (Main 스레드) 사용자 입력을 받아 서버로 전송
- */
+ * @brief (Main 스레드) 사용자 입력을 받아 서버로 전송
+ */
 int main()
 {
 	// 1. Winsock 초기화
@@ -202,9 +202,8 @@ int main()
 	std::string userID;
 	std::getline(std::cin, userID);
 
+	// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 	PktLoginReq loginReq;
-	loginReq.packetLength = sizeof(loginReq);
-	loginReq.type = PacketType::LoginReq;
 	strncpy_s(loginReq.userID, userID.c_str(), MAX_USER_ID_LEN);
 
 	if (send(serverSocket, (char*)&loginReq, loginReq.packetLength, 0) == SOCKET_ERROR)
@@ -231,9 +230,8 @@ int main()
 		// (요구사항) 명령어 파싱
 		if (input == "/create")
 		{
+			// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 			PktCreateRoomReq req;
-			req.packetLength = sizeof(req);
-			req.type = PacketType::CreateRoomReq;
 			send(serverSocket, (char*)&req, req.packetLength, 0);
 		}
 		else if (input.rfind("/enter ", 0) == 0) // "/enter "로 시작하는지
@@ -241,9 +239,9 @@ int main()
 			try
 			{
 				int roomID = std::stoi(input.substr(7)); // "/enter " 다음의 숫자
+
+				// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 				PktEnterRoomReq req;
-				req.packetLength = sizeof(req);
-				req.type = PacketType::EnterRoomReq;
 				req.roomID = roomID;
 				send(serverSocket, (char*)&req, req.packetLength, 0);
 			}
@@ -254,25 +252,22 @@ int main()
 		}
 		else if (input == "/leave")
 		{
+			// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 			PktLeaveRoomReq req;
-			req.packetLength = sizeof(req);
-			req.type = PacketType::LeaveRoomReq;
 			send(serverSocket, (char*)&req, req.packetLength, 0);
 		}
 		// [랜덤 입장 추가]
 		else if (input == "/random")
 		{
+			// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 			PktEnterRandomRoomReq req;
-			req.packetLength = sizeof(req);
-			req.type = PacketType::EnterRandomRoomReq;
 			send(serverSocket, (char*)&req, req.packetLength, 0);
 		}
 		else
 		{
 			// (요구사항) 일반 채팅
+			// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 			PktChatReq req;
-			req.packetLength = sizeof(req);
-			req.type = PacketType::ChatReq;
 			strncpy_s(req.message, input.c_str(), MAX_CHAT_LEN);
 			send(serverSocket, (char*)&req, req.packetLength, 0);
 		}

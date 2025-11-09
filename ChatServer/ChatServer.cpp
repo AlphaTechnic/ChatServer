@@ -313,8 +313,8 @@ std::mutex g_dbMutex; // g_chatLogDB 접근 제어를 위한 뮤텍스
 // [In-Memory DB] --- DB 헬퍼 함수 ---
 
 /**
- * @brief 채팅 메시지를 인메모리 DB에 저장 (스레드 안전)
- */
+ * @brief 채팅 메시지를 인메모리 DB에 저장 (스레드 안전)
+ */
 static void LogChatMessage(int roomID, const std::string& userID, const std::string& message)
 {
 	std::lock_guard<std::mutex> lock(g_dbMutex); // (중요) DB 접근 잠금
@@ -331,8 +331,8 @@ static void LogChatMessage(int roomID, const std::string& userID, const std::str
 }
 
 /**
- * @brief [요구사항] 7일이 지난 오래된 로그를 삭제합니다. (스레드 안전)
- */
+ * @brief [요구사항] 7일이 지난 오래된 로그를 삭제합니다. (스레드 안전)
+ */
 static void CleanupOldChatLogs()
 {
 	std::cout << "[DB] Running cleanup for logs older than 7 days..." << std::endl;
@@ -411,9 +411,8 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		g_Lobby.AddUser(pSession);
 
 		// 응답 전송
+		// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 		PktLoginRes res;
-		res.packetLength = sizeof(res);
-		res.type = PacketType::LoginRes;
 		res.success = true;
 		PostSend(pSession, (char*)&res, res.packetLength);
 		break;
@@ -433,9 +432,8 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		pNewRoom->AddUser(pSession); // (방장은 항상 입장 성공)
 
 		// 4. 응답 전송
+		// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 		PktCreateRoomRes res;
-		res.packetLength = sizeof(res);
-		res.type = PacketType::CreateRoomRes;
 		res.success = true;
 		res.newRoomID = pNewRoom->GetID();
 		PostSend(pSession, (char*)&res, res.packetLength);
@@ -449,13 +447,12 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		PktEnterRoomReq* pReq = reinterpret_cast<PktEnterRoomReq*>(pPacketData);
 		Room* pRoom = g_RoomManager.GetRoom(pReq->roomID);
 
+		// [수정] 생성자가 length, type, success=false를 설정
 		PktEnterRoomRes res; // 응답 패킷 미리 준비
-		res.packetLength = sizeof(res);
-		res.type = PacketType::EnterRoomRes;
 
 		if (pRoom == nullptr) // 방이 없음
 		{
-			res.success = false;
+			// res.success = false; (생성자에서 이미 false로 초기화됨)
 		}
 		else
 		{
@@ -470,7 +467,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 			else
 			{
 				// 입장 실패 (방 꽉 참)
-				res.success = false;
+				// res.success = false; (생성자에서 이미 false로 초기화됨)
 			}
 		}
 		PostSend(pSession, (char*)&res, res.packetLength);
@@ -485,14 +482,13 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		// 1. 입장 가능한 랜덤 방 탐색
 		Room* pRoom = g_RoomManager.GetRandomAvailableRoomOrNull();
 
+		// [수정] 생성자가 length, type, success=false를 설정
 		PktEnterRoomRes res; // 응답은 EnterRoomRes와 동일
-		res.packetLength = sizeof(res);
-		res.type = PacketType::EnterRoomRes;
 
 		if (pRoom == nullptr) // 입장 가능한 방이 없음
 		{
 			std::cout << "[System] No available rooms for random entry for User '" << pSession->userID << "'." << std::endl;
-			res.success = false;
+			// res.success = false; (생성자에서 이미 false로 초기화됨)
 		}
 		else
 		{
@@ -508,7 +504,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 			{
 				// 입장 실패 (그 사이에 방이 꽉 참 - Race Condition)
 				std::cout << "[System] Random entry failed (Race Condition) for User '" << pSession->userID << "'." << std::endl;
-				res.success = false;
+				// res.success = false; (생성자에서 이미 false로 초기화됨)
 			}
 		}
 		PostSend(pSession, (char*)&res, res.packetLength);
@@ -533,9 +529,8 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		g_Lobby.AddUser(pSession); // 로비로 이동
 
 		// 응답 전송
+		// [수정] 생성자가 length와 type을 설정하므로 중복 코드 제거
 		PktLeaveRoomRes res;
-		res.packetLength = sizeof(res);
-		res.type = PacketType::LeaveRoomRes;
 		res.success = true;
 		PostSend(pSession, (char*)&res, res.packetLength);
 		break;
@@ -553,9 +548,8 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 		// ------------------------------------
 
 		// (요구사항) 브로드캐스팅
+		// [수정] 생성자가 length, type, 빈 문자열로 초기화
 		PktChatNtf ntf; // 알림 패킷 생성
-		ntf.packetLength = sizeof(ntf);
-		ntf.type = PacketType::ChatNtf;
 		strncpy_s(ntf.userID, pSession->userID.c_str(), MAX_USER_ID_LEN);
 		strncpy_s(ntf.message, message.c_str(), MAX_CHAT_LEN); // [In-Memory DB] message 변수 사용
 
@@ -754,7 +748,7 @@ static void WorkerThread()
 // [Timeout 추가]
 /**
  * @brief 주기적으로 모든 세션을 검사하여 타임아웃된 세션을 정리하는 스레드
- * [In-Memory DB] DB 정리 작업도 이 스레드에서 주기적으로 수행
+ * [In-Memory DB] DB 정리 작업도 이 스레드에서 주기적으로 수행
  */
 static void TimeoutThread()
 {
@@ -875,8 +869,7 @@ int main()
 	}
 
 	// 5. 서버 주소 설정 및 바인딩
-	sockaddr_in serverAddr;
-	ZeroMemory(&serverAddr, sizeof(serverAddr));
+	sockaddr_in serverAddr = { 0, };
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serverAddr.sin_port = htons(SERVER_PORT);
@@ -903,7 +896,7 @@ int main()
 	// 7. 메인 스레드의 Accept 루프
 	while (true)
 	{
-		sockaddr_in clientAddr;
+		sockaddr_in clientAddr = { 0, };
 		int addrLen = sizeof(clientAddr);
 		SOCKET clientSocket = accept(listenSocket, (sockaddr*)&clientAddr, &addrLen);
 
