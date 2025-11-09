@@ -18,6 +18,24 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Database.h" />
+    <ClInclude Include="GameLogic.h" />
+    <ClInclude Include="IocpManager.h" />
+    <ClInclude Include="PacketHandler.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="ServerCore.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ChatServer.cpp" />
+    <ClCompile Include="Database.cpp" />
+    <ClCompile Include="GameLogic.cpp" />
+    <ClCompile Include="IocpManager.cpp" />
+    <ClCompile Include="PacketHandler.cpp" />
+    <ClCompile Include="Session.cpp" />
+    <ClCompile Include="Session.h" />
+    <ClCompile Include="pch.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -126,9 +144,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="ChatServer.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
