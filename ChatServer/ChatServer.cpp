@@ -8,11 +8,19 @@
 #include <string>		// (v2 추가)
 #include <atomic>		// (v2 추가)
 #include <memory>		// (v2 추가)
-#include <random>		// [랜덤 입장 추가]
+#include <random>		// (랜덤 입장 추가)
+#include <chrono>		// [Timeout 추가]
 
 #include "Protocol.h"
 
 #pragma comment(lib, "ws2_32.lib")
+
+// [Timeout 추가] --- 타임아웃 설정 ---
+// 마지막 활동 후 60초가 지나면 타임아웃
+constexpr int SESSION_TIMEOUT_SECONDS = 60;
+// 5초마다 타임아웃 검사
+constexpr int TIMEOUT_CHECK_INTERVAL_MS = 5000;
+
 
 // I/O 작업의 종류를 구분하기 위한 열거형
 enum class IOOperation
@@ -44,7 +52,15 @@ struct Session
 	char packetBuffer[MAX_BUFFER_SIZE * 2];
 	int currentPacketSize; // 현재까지 조립된 패킷 크기
 
-	Session(SOCKET s) : socket(s), currentRoomID(LOBBY_ID), isLoggedIn(false), currentPacketSize(0)
+	// [Timeout 추가] 마지막 활동 시간을 기록 (원자적 접근)
+	std::atomic<std::chrono::steady_clock::time_point> lastActivityTime;
+
+	Session(SOCKET s) :
+		socket(s),
+		currentRoomID(LOBBY_ID),
+		isLoggedIn(false),
+		currentPacketSize(0),
+		lastActivityTime(std::chrono::steady_clock::now()) // [Timeout 추가]
 	{
 		ZeroMemory(&recvOverlapped, sizeof(OverlappedEx));
 		recvOverlapped.operation = IOOperation::Recv;
@@ -271,6 +287,11 @@ private:
 HANDLE g_iocpHandle;
 Lobby g_Lobby;			// (v2 추가)
 RoomManager g_RoomManager; // (v2 추가)
+
+// [Timeout 추가]
+// 모든 활성 세션을 관리하기 위한 전역 맵 및 뮤텍스
+std::unordered_map<SOCKET, Session*> g_sessions;
+std::mutex g_sessionMutex;
 
 
 // (v2 추가) --- 핵심 로직 함수 ---
@@ -572,7 +593,18 @@ void WorkerThread()
 		// (v2 수정) 클라이언트 접속 종료 처리
 		if (!result || bytesTransferred == 0)
 		{
-			std::cout << "Client disconnected (Socket: " << pSession->socket << ", User: " << pSession->userID << ")" << std::endl;
+			// [Timeout 추가]
+			// !result: 소켓 에러 (TimeoutThread가 closesocket() 호출 시 여기로 들어옴)
+			// bytesTransferred == 0: 클라이언트가 정상 종료
+			if (!result)
+			{
+				std::cout << "Client disconnected (Socket Error " << WSAGetLastError() << ", User: " << pSession->userID << ")" << std::endl;
+			}
+			else
+			{
+				std::cout << "Client disconnected (Graceful, User: " << pSession->userID << ")" << std::endl;
+			}
+
 
 			// (v2 추가) 유저가 있던 곳(로비/방)에서 제거
 			if (pSession->isLoggedIn)
@@ -595,6 +627,12 @@ void WorkerThread()
 				}
 			}
 
+			// [Timeout 추가] 전역 세션 맵에서 제거
+			{
+				std::lock_guard<std::mutex> lock(g_sessionMutex);
+				g_sessions.erase(pSession->socket);
+			}
+
 			closesocket(pSession->socket);
 			delete pSession; // 세션 객체 삭제
 			continue;
@@ -605,6 +643,10 @@ void WorkerThread()
 		{
 		case IOOperation::Recv:
 		{
+			// [Timeout 추가]
+			// 클라이언트로부터 데이터를 받았으므로 마지막 활동 시간 갱신
+			pSession->lastActivityTime = std::chrono::steady_clock::now();
+
 			// (v2 수정) 패킷 처리 로직을 별도 함수로 분리
 			ProcessRecv(pSession, bytesTransferred);
 
@@ -643,6 +685,67 @@ void WorkerThread()
 	}
 }
 
+// [Timeout 추가]
+/**
+ * @brief 주기적으로 모든 세션을 검사하여 타임아웃된 세션을 정리하는 스레드
+ */
+void TimeoutThread()
+{
+	std::cout << "[Debug] Timeout Thread " << std::this_thread::get_id() << " started." << std::endl;
+
+	while (true)
+	{
+		// 1. 일정 시간 대기
+		std::this_thread::sleep_for(std::chrono::milliseconds(TIMEOUT_CHECK_INTERVAL_MS));
+
+		auto now = std::chrono::steady_clock::now();
+
+		// 강제 종료할 소켓 리스트 (g_sessionMutex 락을 오래 잡지 않기 위함)
+		std::vector<SOCKET> timedOutSockets;
+
+		// 2. 전체 세션 맵(g_sessions)을 잠그고 순회
+		{
+			std::lock_guard<std::mutex> lock(g_sessionMutex);
+
+			if (g_sessions.empty()) continue; // (최적화)
+
+			// g_sessions를 순회하면서 타임아웃된 세션을 찾음
+			for (auto& pair : g_sessions)
+			{
+				Session* pSession = pair.second;
+
+				// (중요) atomic<time_point> 읽기
+				auto lastActivity = pSession->lastActivityTime.load();
+
+				auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(now - lastActivity).count();
+
+				if (elapsedSeconds > SESSION_TIMEOUT_SECONDS)
+				{
+					// 타임아웃
+					timedOutSockets.push_back(pSession->socket);
+				}
+			}
+		} // (Mutex Unlock)
+
+		// 3. (중요) 맵 락을 푼 상태에서 소켓을 닫음
+		// 맵을 잠근 상태로 closesocket을 호출하면 데드락 위험이 있음
+		// (WorkerThread가 closesocket으로 인해 GQCS에서 깨어나 g_sessionMutex를 잡으려 할 수 있음)
+		if (!timedOutSockets.empty())
+		{
+			std::cout << "[Timeout] Disconnecting " << timedOutSockets.size() << " inactive clients..." << std::endl;
+			for (SOCKET sock : timedOutSockets)
+			{
+				// closesocket()을 호출하면 해당 소켓의 모든 보류 중인
+				// I/O 작업(WSARecv)이 즉시 실패하고,
+				// WorkerThread의 GetQueuedCompletionStatus가
+				// 'result == false'로 리턴됨.
+				// 그러면 WorkerThread가 기존 연결 종료 로직(g_sessions에서 제거 등)을 수행함.
+				closesocket(sock);
+			}
+		}
+	}
+}
+
 
 // --- 메인 스레드 함수 (v1과 거의 동일) ---
 int main()
@@ -675,6 +778,10 @@ int main()
 		workerThreads.emplace_back(WorkerThread);
 	}
 	std::cout << "Server :: " << threadCount << " worker threads created." << std::endl;
+
+	// [Timeout 추가] 타임아웃 스레드 시작
+	std::thread timeoutTh(TimeoutThread);
+	timeoutTh.detach(); // 메인 스레드와 분리
 
 
 	// 4. 리슨 소켓 생성
@@ -732,6 +839,12 @@ int main()
 		// 1. (v2 수정) 세션 생성 (소켓 전달)
 		Session* pSession = new Session(clientSocket);
 
+		// [Timeout 추가] 전역 세션 맵에 추가
+		{
+			std::lock_guard<std::mutex> lock(g_sessionMutex);
+			g_sessions[clientSocket] = pSession;
+		}
+
 		// 2. IOCP에 연결 (CompletionKey로 pSession 전달)
 		CreateIoCompletionPort((HANDLE)clientSocket, g_iocpHandle, (ULONG_PTR)pSession, 0);
 
@@ -751,6 +864,12 @@ int main()
 		if (recvResult == SOCKET_ERROR && WSAGetLastError() != ERROR_IO_PENDING)
 		{
 			std::cerr << "WSARecv failed immediately!" << std::endl;
+
+			// [Timeout 추가] 실패 시 전역 맵에서 즉시 제거
+			{
+				std::lock_guard<std::mutex> lock(g_sessionMutex);
+				g_sessions.erase(clientSocket);
+			}
 			closesocket(clientSocket);
 			delete pSession;
 		}
