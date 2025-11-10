@@ -18,10 +18,10 @@ int main()
 		return 1;
 	}
 
-	std::cout << "서버에 성공적으로 접속했습니다." << std::endl;
+    std::cout << "Successfully connected to the server." << std::endl;
 
 	// login
-	std::cout << "사용할 아이디를 입력하세요: ";
+    std::cout << "Enter your user ID: ";
 	std::string userID;
 	std::getline(std::cin, userID);
 
@@ -32,7 +32,7 @@ int main()
     // start receive thread
 	NetworkClient::StartRecvThread();
 
-	std::cout << "--- 채팅 시작 (명령어: /create, /enter [ID], /leave, /random, 종료: /exit) ---" << std::endl;
+    std::cout << "--- Chat started (commands: /create, /enter [ID], /leave, /random, exit: /exit) ---" << std::endl;
 	std::string input;
 
     // it becomes false when the connection is lost in the Recv thread
@@ -62,7 +62,7 @@ int main()
 			}
 			catch (...)
 			{
-				std::cout << "[System] 잘못된 명령어입니다. 예: /enter 0" << std::endl;
+                std::cout << "[System] Invalid command. Example: /enter 0" << std::endl;
 			}
 		}
 		else if (input == "/leave")
@@ -83,7 +83,7 @@ int main()
 		}
 	}
 
-	std::cout << "클라이언트를 종료합니다." << std::endl;
+    std::cout << "Exiting the chat client." << std::endl;
 	NetworkClient::Disconnect();
 	WSACleanup();
 

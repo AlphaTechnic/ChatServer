@@ -25,7 +25,7 @@ namespace NetworkClient
                 // server closed normally, -1: socket error (when Disconnect() calls closesocket())
 				if (g_isConnected)
 				{
-					std::cout << "[System] 서버와 연결이 끊어졌습니다." << std::endl;
+                    std::cout << "[System] Disconnected from server." << std::endl;
 				}
                 g_isConnected = false;
 				break;
@@ -100,7 +100,7 @@ namespace NetworkClient
 	{
 		if (!g_isConnected)
 		{
-			std::cout << "[System] 서버와 연결되어 있지 않습니다." << std::endl;
+            std::cout << "[System] Not connected to the server." << std::endl;
 			return;
 		}
 
