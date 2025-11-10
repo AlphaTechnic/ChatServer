@@ -1,11 +1,8 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "PacketHandler.h"
 
 namespace PacketHandler
 {
-	/**
-	 * @brief 서버로부터 받은 패킷을 처리하는 함수
-	 */
 	void ProcessPacket(char* pPacketData)
 	{
 		PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(pPacketData);
@@ -36,7 +33,7 @@ namespace PacketHandler
 			if (pRes->success)
 				std::cout << "[System] 방 입장 성공. (Room ID: " << pRes->roomID << ")" << std::endl;
 			else
-				std::cout << "[System] 방 입장 실패 (예: 방이 없거나, 꽉 찼거나, 입장 가능한 방이 없음)." << std::endl;
+				std::cout << "[System] 방 입장 실패 (예: 방이 없거나, 방이 꽉 찼음)." << std::endl;
 			break;
 		}
 		case PacketType::LeaveRoomRes:
@@ -87,4 +84,4 @@ namespace PacketHandler
 		}
 	}
 
-} // namespace PacketHandler
+}

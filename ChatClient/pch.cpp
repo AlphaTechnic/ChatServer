@@ -1,3 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 
-// 이 파일은 미리 컴파일된 헤더를 생성하기 위한 용도입니다.
+// this file is intended for generating precompiled headers.
+// no special content is needed.
