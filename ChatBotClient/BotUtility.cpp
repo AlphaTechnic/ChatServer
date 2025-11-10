@@ -3,7 +3,11 @@
 
 static std::mutex g_logMutex;
 
-thread_local std::mt19937 g_rng(std::random_device{}() + static_cast<unsigned int>(std::hash<std::thread::id>{}(std::this_thread::get_id())));
+thread_local std::mt19937 g_rng = []() {
+    std::random_device rd;
+    auto seed = rd() + static_cast<unsigned int>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+    return std::mt19937(seed);
+}();
 
 
 void Log(const std::string& message)
