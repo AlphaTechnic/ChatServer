@@ -11,12 +11,10 @@ struct Session
     std::string userID;
     bool isLoggedIn;
 
-    // buffer to assemble packets
     char packetBuffer[MAX_BUFFER_SIZE * 2];
-    // current size of data in the buffer
     int currentPacketSize;
 
-    // in order to safely update and read the last activity time across multiple threads, we use std::atomic
+    // in order to safely update and read the last activity time across multiple threads
     std::atomic<std::chrono::steady_clock::time_point> lastActivityTime;
 
     Session(SOCKET s);
