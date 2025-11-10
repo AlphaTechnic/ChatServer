@@ -79,7 +79,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
         if (!pSession->isLoggedIn || pSession->currentRoomID != LOBBY_ID) break;
 
         PktEnterRoomReq* pReq = reinterpret_cast<PktEnterRoomReq*>(pPacketData);
-        Room* pRoom = g_RoomManager.GetRoom(pReq->roomID);
+        Room* pRoom = g_RoomManager.GetRoomOrNull(pReq->roomID);
 
         PktEnterRoomRes res; // success는 기본 false
         if (pRoom != nullptr)
@@ -127,7 +127,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
     {
         if (!pSession->isLoggedIn || pSession->currentRoomID == LOBBY_ID) break;
 
-        Room* pRoom = g_RoomManager.GetRoom(pSession->currentRoomID);
+        Room* pRoom = g_RoomManager.GetRoomOrNull(pSession->currentRoomID);
         if (pRoom)
         {
             pRoom->RemoveUser(pSession);
@@ -165,7 +165,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
         }
         else
         {
-            Room* pRoom = g_RoomManager.GetRoom(pSession->currentRoomID);
+            Room* pRoom = g_RoomManager.GetRoomOrNull(pSession->currentRoomID);
             if (pRoom)
             {
                 pRoom->Broadcast((char*)&ntf, ntf.packetLength);

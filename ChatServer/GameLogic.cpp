@@ -1,19 +1,18 @@
 #include "pch.h"
 #include "GameLogic.h"
-#include "PacketHandler.h" // PostSend 사용을 위해
-#include "Session.h"       // Session 정보 접근
+#include "PacketHandler.h"
+#include "Session.h"
 
-// --- 전역 게임 로직 객체 (정의) ---
 Lobby g_Lobby;
 RoomManager g_RoomManager;
 
-// --- Room 클래스 구현 ---
+// Room
 Room::Room(int id) : m_roomID(id) {}
 
 bool Room::AddUser(Session* pSession)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_sessions.size() >= MAX_ROOM_USERS) // Protocol.h
+    if (m_sessions.size() >= MAX_ROOM_USERS)
     {
         return false;
     }
@@ -23,7 +22,6 @@ bool Room::AddUser(Session* pSession)
 
     std::cout << "[Room " << m_roomID << "] User '" << pSession->userID << "' entered. (Total: " << m_sessions.size() << ")" << std::endl;
 
-    // TODO: 입장 알림 로직
     return true;
 }
 
@@ -31,11 +29,9 @@ void Room::RemoveUser(Session* pSession)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_sessions.erase(pSession->socket);
-    pSession->currentRoomID = LOBBY_ID; // Protocol.h
+    pSession->currentRoomID = LOBBY_ID;
 
     std::cout << "[Room " << m_roomID << "] User '" << pSession->userID << "' left. (Total: " << m_sessions.size() << ")" << std::endl;
-
-    // TODO: 퇴장 알림 로직
 }
 
 void Room::Broadcast(char* pPacket, int size, SOCKET exceptSocket)
@@ -57,7 +53,7 @@ int Room::GetUserCount()
 }
 
 
-// --- Lobby 클래스 구현 ---
+// Lobby
 void Lobby::AddUser(Session* pSession)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -65,8 +61,6 @@ void Lobby::AddUser(Session* pSession)
     pSession->currentRoomID = LOBBY_ID;
 
     std::cout << "[Lobby] User '" << pSession->userID << "' entered. (Total: " << m_sessions.size() << ")" << std::endl;
-
-    // TODO: 입장 알림 로직
 }
 
 void Lobby::RemoveUser(Session* pSession)
@@ -75,8 +69,6 @@ void Lobby::RemoveUser(Session* pSession)
     m_sessions.erase(pSession->socket);
 
     std::cout << "[Lobby] User '" << pSession->userID << "' left. (Total: " << m_sessions.size() << ")" << std::endl;
-
-    // TODO: 퇴장 알림 로직
 }
 
 void Lobby::Broadcast(char* pPacket, int size, SOCKET exceptSocket)
@@ -92,7 +84,7 @@ void Lobby::Broadcast(char* pPacket, int size, SOCKET exceptSocket)
 }
 
 
-// --- RoomManager 클래스 구현 ---
+// RoomManager
 Room* RoomManager::CreateRoom()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -104,7 +96,7 @@ Room* RoomManager::CreateRoom()
     return pRoom;
 }
 
-Room* RoomManager::GetRoom(int roomID)
+Room* RoomManager::GetRoomOrNull(int roomID)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_rooms.find(roomID);

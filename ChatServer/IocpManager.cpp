@@ -95,7 +95,7 @@ namespace IocpManager
             }
             else
             {
-                Room* pRoom = g_RoomManager.GetRoom(pSession->currentRoomID);
+                Room* pRoom = g_RoomManager.GetRoomOrNull(pSession->currentRoomID);
                 if (pRoom)
                 {
                     pRoom->RemoveUser(pSession);
