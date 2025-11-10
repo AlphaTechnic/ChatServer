@@ -1,23 +1,19 @@
 #pragma once
 #include "pch.h"
-#include "BotUtility.h" // GetRandomDouble
+#include "BotUtility.h"
 
-// 봇의 행동 트리 노드가 반환할 상태
 enum class NodeStatus
 {
     Success,
     Failure
 };
 
-// 봇의 모든 행동 트리를 구성할 기본 노드 (Interface)
 class Node
 {
 public:
     virtual ~Node() = default;
     virtual NodeStatus Tick(Bot* bot) = 0;
 };
-
-// --- Composite Nodes (자식 노드를 가지는 노드) ---
 
 class CompositeNode : public Node
 {
@@ -31,9 +27,7 @@ protected:
     std::vector<std::unique_ptr<Node>> m_children;
 };
 
-/**
- * @brief (Selector 노드 - 'OR' 연산)
- */
+// Selector node handles 'OR' logic
 class Selector : public CompositeNode
 {
 public:
@@ -50,9 +44,7 @@ public:
     }
 };
 
-/**
- * @brief (Sequence 노드 - 'AND' 연산)
- */
+// Sequence node handles 'AND' logic
 class Sequence : public CompositeNode
 {
 public:
@@ -69,13 +61,10 @@ public:
     }
 };
 
-/**
- * @brief (Probabilistic Selector 노드 - '확률적 OR' 연산)
- */
+// Probabilistic Selector node handles 'probabilistic OR' logic
 class ProbabilisticSelector : public CompositeNode
 {
 public:
-    // 가중치와 함께 자식 추가
     void AddChild(std::unique_ptr<Node> child, double weight)
     {
         CompositeNode::AddChild(std::move(child));
@@ -108,7 +97,7 @@ public:
             currentSum += m_weights[i];
             if (roll < currentSum)
             {
-                return m_children[i]->Tick(bot); // 선택된 자식 실행
+                return m_children[i]->Tick(bot);
             }
         }
         return m_children.back()->Tick(bot);

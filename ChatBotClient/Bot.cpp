@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Bot.h"
-#include "BotUtility.h" // Log()
-#include "BotNodes.h"   // BuildBehaviorTree()에서 사용
+#include "BotUtility.h"
+#include "BotNodes.h"
 
 Bot::Bot(std::string userID)
     : m_userID(userID),
@@ -19,20 +19,18 @@ Bot::~Bot()
     Stop();
 }
 
-// --- 봇 메인 로직 (스레드 진입점) ---
 void Bot::Run()
 {
     m_isRunning = true;
     m_state.store(BotState::Disconnected);
 
-    // 1. 행동 트리 구성
     BuildBehaviorTree();
 
-    // 2. 수신 스레드 시작
+    // start the receive thread
     std::thread recvTh(&Bot::RecvThread, this);
     recvTh.detach();
 
-    // 3. BT Tick 메인 루프 (봇의 '의지' 담당)
+    // bot's 'will' handler
     while (m_isRunning.load())
     {
         if (m_behaviorTree)
@@ -40,14 +38,13 @@ void Bot::Run()
             m_behaviorTree->Tick(this);
         }
 
-        int thinkTime = GetRandomInt(500, 2000); // 0.5초 ~ 2초
+        int thinkTime = GetRandomInt(500, 2000); // 0.5 sec ~ 2 sec
         std::this_thread::sleep_for(std::chrono::milliseconds(thinkTime));
     }
 
     Log("[" + m_userID + "] Bot logic loop stopped.");
 }
 
-// --- 봇 종료 ---
 void Bot::Stop()
 {
     if (!m_isRunning.exchange(false))
@@ -60,9 +57,6 @@ void Bot::Stop()
         m_socket = INVALID_SOCKET;
     }
 }
-
-
-// --- 네트워크 관련 ---
 
 bool Bot::TryConnect()
 {
@@ -111,14 +105,13 @@ void Bot::SendPacket(char* pPacket, int size)
     }
 }
 
-// --- 상태 접근자 (Thread-safe) ---
+// state accessors (Thread-safe)
 BotState Bot::GetState() { return m_state.load(); }
 int Bot::GetRoomID() { return m_currentRoomID; }
 const std::string& Bot::GetUserID() { return m_userID; }
 
 
-// --- Private Methods ---
-
+// private methods
 void Bot::RecvThread()
 {
     char recvBuffer[MAX_BUFFER_SIZE];
@@ -143,11 +136,11 @@ void Bot::RecvThread()
             {
                 break;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(3000)); // 재접속 대기
+            std::this_thread::sleep_for(std::chrono::milliseconds(3000)); // wait before retrying
             continue;
         }
 
-        // 패킷 파싱 로직
+        // parse packets from recvBuffer
         memcpy(m_packetBuffer + m_currentPacketSize, recvBuffer, nRecv);
         m_currentPacketSize += nRecv;
 
@@ -220,7 +213,7 @@ void Bot::ProcessPacket(char* pPacketData)
         }
         else
         {
-            Log("[" + m_userID + "] 방 입장 실패 (방이 없거나/꽉 찼거나/입장 가능한 방 없음)");
+            Log("[" + m_userID + "] 방 입장 실패 (입장 가능한 방 없음)");
         }
         break;
     }
@@ -236,12 +229,14 @@ void Bot::ProcessPacket(char* pPacketData)
         break;
     }
     case PacketType::ChatNtf:
+        /* intentional fallthrough */
     case PacketType::UserEnterNtf:
+        /* intentional fallthrough */
     case PacketType::UserLeaveNtf:
+        /* intentional fallthrough */
     case PacketType::UserListNtf:
-        // 봇은 다른 유저 정보나 채팅 수신을 무시
+        // bot ignores other user info and chat messages
         break;
-
     default:
         break;
     }
@@ -249,48 +244,47 @@ void Bot::ProcessPacket(char* pPacketData)
 
 void Bot::BuildBehaviorTree()
 {
-    // 최상위 루트
     auto root = std::make_unique<Selector>();
 
-    // 1. (Disconnected 상태) -> 접속 시도
+    // 1. (Disconnected state) -> try to connect
     auto seqConnect = std::make_unique<Sequence>();
     seqConnect->AddChild(std::make_unique<Cond_IsState>(BotState::Disconnected));
     seqConnect->AddChild(std::make_unique<Act_TryConnect>());
     root->AddChild(std::move(seqConnect));
 
-    // 2. (Connected 상태) -> 로그인 시도
+    // 2. (Cnnected state) -> try to login
     auto seqLogin = std::make_unique<Sequence>();
     seqLogin->AddChild(std::make_unique<Cond_IsState>(BotState::Connected));
     seqLogin->AddChild(std::make_unique<Act_SendLogin>());
     root->AddChild(std::move(seqLogin));
 
-    // 3. (InLobby 상태) -> 로비 행동 결정
+    // 3. (InLobby state) -> select lobby actions
     auto seqLobby = std::make_unique<Sequence>();
     seqLobby->AddChild(std::make_unique<Cond_IsState>(BotState::InLobby));
-    seqLobby->AddChild(std::make_unique<Act_Wait>(1000, 3000)); // 행동 전 1~3초 대기
+    seqLobby->AddChild(std::make_unique<Act_Wait>(1000, 3000));
 
-    auto probLobby = std::make_unique<ProbabilisticSelector>(); // 확률 노드
-    probLobby->AddChild(std::make_unique<Act_SendChat>(true), 70.0); // 70% 로비 채팅
-    probLobby->AddChild(std::make_unique<Act_SendCreateRoom>(), 15.0); // 15% 방 생성
-    probLobby->AddChild(std::make_unique<Act_SendEnterRandomRoom>(), 10.0); // 10% 랜덤 방 입장
-    probLobby->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% 아무것도 안함
+    auto probLobby = std::make_unique<ProbabilisticSelector>();
+    probLobby->AddChild(std::make_unique<Act_SendChat>(true), 70.0); // 70% chat in lobby
+    probLobby->AddChild(std::make_unique<Act_SendCreateRoom>(), 15.0); // 15% create room
+    probLobby->AddChild(std::make_unique<Act_SendEnterRandomRoom>(), 10.0); // 10% enter random room
+    probLobby->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% do nothing
 
     seqLobby->AddChild(std::move(probLobby));
     root->AddChild(std::move(seqLobby));
 
-    // 4. (InRoom 상태) -> 방 행동 결정
+    // 4. (InRoom state) -> select room actions
     auto seqRoom = std::make_unique<Sequence>();
     seqRoom->AddChild(std::make_unique<Cond_IsState>(BotState::InRoom));
-    seqRoom->AddChild(std::make_unique<Act_Wait>(1000, 5000)); // 행동 전 1~5초 대기
+    seqRoom->AddChild(std::make_unique<Act_Wait>(1000, 5000));
 
-    auto probRoom = std::make_unique<ProbabilisticSelector>(); // 확률 노드
-    probRoom->AddChild(std::make_unique<Act_SendChat>(false), 80.0); // 80% 방 채팅
-    probRoom->AddChild(std::make_unique<Act_SendLeaveRoom>(), 15.0); // 15% 방 나가기
-    probRoom->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% 아무것도 안함
+    auto probRoom = std::make_unique<ProbabilisticSelector>();
+    probRoom->AddChild(std::make_unique<Act_SendChat>(false), 80.0); // 80% chat in room
+    probRoom->AddChild(std::make_unique<Act_SendLeaveRoom>(), 15.0); // 15% leave room
+    probRoom->AddChild(std::make_unique<Act_DoNothing>(), 5.0); // 5% do nothing
 
     seqRoom->AddChild(std::move(probRoom));
     root->AddChild(std::move(seqRoom));
 
-    // 5. 트리를 봇에 장착
+    // 5. attach the tree to the bot
     m_behaviorTree = std::move(root);
 }

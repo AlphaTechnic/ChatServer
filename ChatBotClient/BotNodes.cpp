@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "BotNodes.h"
-#include "Bot.h"        // Tick() 함수가 Bot의 멤버를 호출해야 하므로
-#include "BotUtility.h" // Log(), GetRandomInt()
+#include "Bot.h"
+#include "BotUtility.h"
 
-// --- Leaf Nodes 구현 (Bot 클래스 정의 이후) ---
+// leaf nodes
 
 NodeStatus Cond_IsState::Tick(Bot* bot)
 {
