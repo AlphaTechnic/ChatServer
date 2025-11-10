@@ -1,7 +1,7 @@
 #pragma once
 #include "pch.h"
 
-// 인메모리 DB 자료구조
+// In-memory database structure
 struct ChatLogEntry
 {
     std::chrono::system_clock::time_point timestamp;
@@ -10,6 +10,5 @@ struct ChatLogEntry
     std::string message;
 };
 
-// --- DB 헬퍼 함수 ---
-void LogChatMessage(int roomID, const std::string& userID, const std::string& message);
+void PersistChatMessage(int roomID, const std::string& userID, const std::string& message);
 void CleanupOldChatLogs();

@@ -1,7 +1,6 @@
 #pragma once
 #include "pch.h"
 
-// --- Room 클래스 ---
 class Room
 {
 public:
@@ -20,8 +19,6 @@ private:
     std::unordered_map<SOCKET, Session*> m_sessions;
 };
 
-
-// --- Lobby 클래스 ---
 class Lobby
 {
 public:
@@ -34,15 +31,13 @@ private:
     std::unordered_map<SOCKET, Session*> m_sessions;
 };
 
-
-// --- RoomManager 클래스 ---
 class RoomManager
 {
 public:
-    RoomManager() : m_nextRoomID(0) {} // 방 ID 0부터 시작
+    RoomManager() : m_nextRoomID(0) {} // start room IDs from 0
 
     Room* CreateRoom();
-    Room* GetRoom(int roomID);
+    Room* GetRoomOrNull(int roomID);
     void RemoveRoom(int roomID);
     Room* GetRandomAvailableRoomOrNull();
 
@@ -52,7 +47,5 @@ private:
     std::atomic<int> m_nextRoomID;
 };
 
-
-// --- 전역 게임 로직 객체 (외부 선언) ---
 extern Lobby g_Lobby;
 extern RoomManager g_RoomManager;

@@ -1,18 +1,13 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "NetworkClient.h"
-#include "PacketHandler.h" // RecvThread가 ProcessPacket을 호출하기 위해
+#include "PacketHandler.h"
 
 namespace NetworkClient
 {
-	// 이 cpp 파일 내에서만 사용되는 전역 소켓 및 상태
 	static SOCKET g_serverSocket = INVALID_SOCKET;
 	static std::atomic<bool> g_isConnected = false;
 
-	// --- 내부 스레드 함수 ---
-
-	/**
-	 * @brief (Recv 스레드) 서버로부터 패킷을 수신하는 스레드
-	 */
+	// receiving packets from server
 	static void RecvThread()
 	{
 		char recvBuffer[MAX_BUFFER_SIZE];
@@ -23,33 +18,28 @@ namespace NetworkClient
 
 		while (g_isConnected)
 		{
-			// 1. 데이터 수신 (Blocking)
+            // receive data from server
 			int nRecv = recv(g_serverSocket, recvBuffer, MAX_BUFFER_SIZE, 0);
 			if (nRecv <= 0)
 			{
-				// 0: 서버가 정상 종료, -1: 소켓 오류 (Disconnect()에서 closesocket() 호출 시)
-				if (g_isConnected) // Disconnect()가 아닌, 서버에 의해 끊겼을 때만 메시지 출력
+                // server closed normally, -1: socket error (when Disconnect() calls closesocket())
+				if (g_isConnected)
 				{
-					std::cout << "[System] 서버와 연결이 끊어졌습니다." << std::endl;
+                    std::cout << "[System] Disconnected from server." << std::endl;
 				}
-				g_isConnected = false; // 연결 상태 변경
+                g_isConnected = false;
 				break;
 			}
 
-			// 2. 수신한 데이터를 패킷 조립 버퍼에 복사
+            // copy received data to packet assembly buffer
 			memcpy(packetBuffer + currentPacketSize, recvBuffer, nRecv);
 			currentPacketSize += nRecv;
-
-			// 3. 패킷 조립
 			while (currentPacketSize >= sizeof(PacketHeader))
 			{
 				PacketHeader* pHeader = reinterpret_cast<PacketHeader*>(packetBuffer);
 				if (currentPacketSize >= pHeader->packetLength)
 				{
-					// 패킷 완성 -> PacketHandler에 처리 위임
-					PacketHandler::ProcessPacket(packetBuffer);
-
-					// 처리한 패킷만큼 버퍼에서 제거
+                    PacketHandler::ProcessPacket(packetBuffer);
 					int remainingSize = currentPacketSize - pHeader->packetLength;
 					if (remainingSize > 0)
 					{
@@ -59,16 +49,13 @@ namespace NetworkClient
 				}
 				else
 				{
-					// 패킷이 아직 덜 옴
+                    // packet is not fully received yet
 					break;
 				}
 			}
 		}
 		std::cout << "[Debug] Recv thread stopped." << std::endl;
 	}
-
-
-	// --- 공개 함수 구현 ---
 
 	bool ConnectToServer(const char* serverIP, short serverPort)
 	{
@@ -99,10 +86,11 @@ namespace NetworkClient
 
 	void Disconnect()
 	{
-		g_isConnected = false; // Recv 스레드가 루프를 종료하도록 함
+        // set connection flag to false to stop Recv thread loop
+		g_isConnected = false;
 		if (g_serverSocket != INVALID_SOCKET)
 		{
-			// recv()에서 블로킹 중인 스레드를 깨우기 위해 소켓을 닫음
+            // close the socket to unblock recv() in the recv thread
 			closesocket(g_serverSocket);
 			g_serverSocket = INVALID_SOCKET;
 		}
@@ -112,20 +100,18 @@ namespace NetworkClient
 	{
 		if (!g_isConnected)
 		{
-			std::cout << "[System] 서버와 연결되어 있지 않습니다." << std::endl;
+            std::cout << "[System] Not connected to the server." << std::endl;
 			return;
 		}
 
 		if (send(g_serverSocket, pPacket, size, 0) == SOCKET_ERROR)
 		{
 			std::cerr << "Send failed!" << std::endl;
-			// (Send 실패 시 Disconnect()를 호출하여 정리하는 로직을 추가할 수 있음)
 		}
 	}
 
 	void StartRecvThread()
 	{
-		// 스레드를 생성하고 즉시 분리(detach)
 		std::thread(RecvThread).detach();
 	}
 
@@ -134,4 +120,4 @@ namespace NetworkClient
 		return g_isConnected;
 	}
 
-} // namespace NetworkClient
+}

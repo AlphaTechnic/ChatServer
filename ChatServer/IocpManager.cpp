@@ -5,10 +5,8 @@
 #include "Database.h"
 #include "PacketHandler.h"
 
-// IocpManager 이름 공간 내부에 구현을 정의합니다.
 namespace IocpManager
 {
-    // --- 전역 변수 (이제 namespace 내부의 static 변수) ---
     static HANDLE g_iocpHandle;
     static std::vector<std::thread> g_workerThreads;
     static std::atomic<bool> g_isServerRunning = true;
@@ -16,13 +14,8 @@ namespace IocpManager
     static std::unordered_map<SOCKET, Session*> g_sessions;
     static std::mutex g_sessionMutex;
 
-
-    // --- 스레드 함수 (이제 namespace 내부의 static 함수) ---
     static void WorkerThread();
     static void TimeoutThread();
-
-
-    // --- IOCP 및 스레드 관리 함수 구현 ---
 
     bool InitIocp(int threadCount)
     {
@@ -76,8 +69,6 @@ namespace IocpManager
     }
 
 
-    // --- 세션 관리 함수 구현 ---
-
     void AddSession(Session* pSession)
     {
         std::lock_guard<std::mutex> lock(g_sessionMutex);
@@ -86,7 +77,7 @@ namespace IocpManager
 
     void RemoveSession(SOCKET socket, Session* pSession)
     {
-        // 1. 게임 로직에서 제거
+        // 1. remove from game logic
         if (pSession->isLoggedIn)
         {
             if (pSession->currentRoomID == LOBBY_ID)
@@ -95,7 +86,7 @@ namespace IocpManager
             }
             else
             {
-                Room* pRoom = g_RoomManager.GetRoom(pSession->currentRoomID);
+                Room* pRoom = g_RoomManager.GetRoomOrNull(pSession->currentRoomID);
                 if (pRoom)
                 {
                     pRoom->RemoveUser(pSession);
@@ -107,19 +98,18 @@ namespace IocpManager
             }
         }
 
-        // 2. 전역 세션 맵에서 제거
+        // 2. remove from global session map
         {
             std::lock_guard<std::mutex> lock(g_sessionMutex);
             g_sessions.erase(socket);
         }
 
-        // 3. 리소스 정리
+        // 3. release resources
         closesocket(pSession->socket);
         delete pSession;
     }
 
 
-    // --- 워커 스레드 함수 ---
     static void WorkerThread()
     {
         DWORD bytesTransferred;
@@ -167,7 +157,7 @@ namespace IocpManager
             case IOOperation::Recv:
             {
                 pSession->lastActivityTime = std::chrono::steady_clock::now();
-                ProcessRecv(pSession, bytesTransferred); // PacketHandler.h에 있음 (namespace 없음)
+                ProcessRecv(pSession, bytesTransferred);
 
                 DWORD recvBytes = 0;
                 DWORD flags = 0;
@@ -200,8 +190,6 @@ namespace IocpManager
         }
     }
 
-
-    // --- 타임아웃 스레드 함수 ---
     static void TimeoutThread()
     {
         std::cout << "[Debug] Timeout Thread " << std::this_thread::get_id() << " started." << std::endl;
@@ -219,7 +207,7 @@ namespace IocpManager
             auto elapsedSinceCleanup = std::chrono::duration_cast<std::chrono::hours>(now - lastDbCleanupTime);
             if (elapsedSinceCleanup.count() >= DB_CLEANUP_INTERVAL_HOURS)
             {
-                CleanupOldChatLogs(); // Database.h에 있음 (namespace 없음)
+                CleanupOldChatLogs();
                 lastDbCleanupTime = now;
             }
 
@@ -252,5 +240,4 @@ namespace IocpManager
         }
         std::cout << "[Debug] Timeout Thread " << std::this_thread::get_id() << " exiting." << std::endl;
     }
-
-} // namespace IocpManager
+}

@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "BotNodes.h"
-#include "Bot.h"        // Tick() 함수가 Bot의 멤버를 호출해야 하므로
-#include "BotUtility.h" // Log(), GetRandomInt()
+#include "Bot.h"
+#include "BotUtility.h"
 
-// --- Leaf Nodes 구현 (Bot 클래스 정의 이후) ---
+// leaf nodes
 
 NodeStatus Cond_IsState::Tick(Bot* bot)
 {
@@ -12,13 +12,13 @@ NodeStatus Cond_IsState::Tick(Bot* bot)
 
 NodeStatus Act_TryConnect::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) 서버 접속 시도...");
+    Log("[" + bot->GetUserID() + "] (Action) Attempting to connect to server...");
     return bot->TryConnect() ? NodeStatus::Success : NodeStatus::Failure;
 }
 
 NodeStatus Act_SendLogin::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) 로그인 요청 전송");
+    Log("[" + bot->GetUserID() + "] (Action) Sending login request");
 
     PktLoginReq req;
     strncpy_s(req.userID, bot->GetUserID().c_str(), MAX_USER_ID_LEN);
@@ -29,12 +29,12 @@ NodeStatus Act_SendLogin::Tick(Bot* bot)
 
 NodeStatus Act_SendChat::Tick(Bot* bot)
 {
-    std::string msg = "안녕하세요! (봇 메시지 #" + std::to_string(GetRandomInt(0, 999)) + ")";
+    std::string msg = "Hello! (Bot message #" + std::to_string(GetRandomInt(0, 999)) + ")";
 
     if (m_isLobbyChat)
-        Log("[" + bot->GetUserID() + "] (Action) 로비 채팅 전송: " + msg);
+        Log("[" + bot->GetUserID() + "] (Action) Lobby chat sent: " + msg);
     else
-        Log("[" + bot->GetUserID() + "] (Action) 방 채팅 전송: " + msg);
+        Log("[" + bot->GetUserID() + "] (Action) Room chat sent: " + msg);
 
     PktChatReq req;
     strncpy_s(req.message, msg.c_str(), MAX_CHAT_LEN);
@@ -45,7 +45,7 @@ NodeStatus Act_SendChat::Tick(Bot* bot)
 
 NodeStatus Act_SendCreateRoom::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) 방 생성 요청");
+    Log("[" + bot->GetUserID() + "] (Action) Sending create room request");
 
     PktCreateRoomReq req;
     bot->SendPacket((char*)&req, req.packetLength);
@@ -54,7 +54,7 @@ NodeStatus Act_SendCreateRoom::Tick(Bot* bot)
 
 NodeStatus Act_SendEnterRandomRoom::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) 랜덤 방 입장 요청");
+    Log("[" + bot->GetUserID() + "] (Action) Sending enter random room request");
 
     PktEnterRandomRoomReq req;
     bot->SendPacket((char*)&req, req.packetLength);
@@ -63,7 +63,7 @@ NodeStatus Act_SendEnterRandomRoom::Tick(Bot* bot)
 
 NodeStatus Act_SendLeaveRoom::Tick(Bot* bot)
 {
-    Log("[" + bot->GetUserID() + "] (Action) 방 퇴장 요청");
+    Log("[" + bot->GetUserID() + "] (Action) Sending leave room request");
 
     PktLeaveRoomReq req;
     bot->SendPacket((char*)&req, req.packetLength);
