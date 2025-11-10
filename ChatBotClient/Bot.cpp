@@ -178,12 +178,12 @@ void Bot::ProcessPacket(char* pPacketData)
         PktLoginRes* pRes = reinterpret_cast<PktLoginRes*>(pPacketData);
         if (pRes->success)
         {
-            Log("[" + m_userID + "] 로그인 성공 -> InLobby");
+            Log("[" + m_userID + "] Login successful -> InLobby");
             m_state.store(BotState::InLobby);
         }
         else
         {
-            Log("[" + m_userID + "] 로그인 실패");
+            Log("[" + m_userID + "] Login failed");
         }
         break;
     }
@@ -192,13 +192,13 @@ void Bot::ProcessPacket(char* pPacketData)
         PktCreateRoomRes* pRes = reinterpret_cast<PktCreateRoomRes*>(pPacketData);
         if (pRes->success)
         {
-            Log("[" + m_userID + "] 방 생성 성공 (Room " + std::to_string(pRes->newRoomID) + ") -> InRoom");
+            Log("[" + m_userID + "] Room creation successful (Room " + std::to_string(pRes->newRoomID) + ") -> InRoom");
             m_currentRoomID.store(pRes->newRoomID);
             m_state.store(BotState::InRoom);
         }
         else
         {
-            Log("[" + m_userID + "] 방 생성 실패");
+            Log("[" + m_userID + "] Room creation failed");
         }
         break;
     }
@@ -207,13 +207,13 @@ void Bot::ProcessPacket(char* pPacketData)
         PktEnterRoomRes* pRes = reinterpret_cast<PktEnterRoomRes*>(pPacketData);
         if (pRes->success)
         {
-            Log("[" + m_userID + "] 방 입장 성공 (Room " + std::to_string(pRes->roomID) + ") -> InRoom");
+            Log("[" + m_userID + "] Successfully entered the room (Room " + std::to_string(pRes->roomID) + ") -> InRoom");
             m_currentRoomID.store(pRes->roomID);
             m_state.store(BotState::InRoom);
         }
         else
         {
-            Log("[" + m_userID + "] 방 입장 실패 (입장 가능한 방 없음)");
+            Log("[" + m_userID + "] Failed to enter the room (no available rooms to enter)");
         }
         break;
     }
@@ -222,7 +222,7 @@ void Bot::ProcessPacket(char* pPacketData)
         PktLeaveRoomRes* pRes = reinterpret_cast<PktLeaveRoomRes*>(pPacketData);
         if (pRes->success)
         {
-            Log("[" + m_userID + "] 방 퇴장 성공 -> InLobby");
+            Log("[" + m_userID + "] Successfully left the room -> InLobby");
             m_currentRoomID.store(LOBBY_ID);
             m_state.store(BotState::InLobby);
         }
