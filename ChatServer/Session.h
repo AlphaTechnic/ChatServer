@@ -16,7 +16,7 @@ struct Session
     // current size of data in the buffer
     int currentPacketSize;
 
-    // In order to safely update and read the last activity time across multiple threads, we use std::atomic
+    // in order to safely update and read the last activity time across multiple threads, we use std::atomic
     std::atomic<std::chrono::steady_clock::time_point> lastActivityTime;
 
     Session(SOCKET s);
