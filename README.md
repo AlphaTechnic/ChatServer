@@ -71,8 +71,8 @@ IOCP(Input/Output Completion Port) 모델을 사용한 C++ 채팅 서버 및 클
 ### 3\. 빌드 방법
 
   * Visual Studio 2022 (v143 C++ 17 이상) 환경에서 개발되었습니다.
-  * `Chat.sln` 파일을 열어 **'Release | x64'** 구성으로 빌드하는 것을 권장합니다.
-  * 모든 프로젝트(`ChatServer`, `ChatClient`, `ChatBotClient`)는 `Common` 프로젝트에 종속됩니다.
+  * `Chat.sln` 파일을 열어 **'Release | x64'** 구성으로 빌드하는 것을 권장 드립니다.
+  * 모든 프로젝트(`ChatServer`, `ChatClient`, `ChatBotClient`)는 `Common` 프로젝트를 의존하고 있습니다.
 
 -----
 
