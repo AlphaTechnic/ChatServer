@@ -197,11 +197,9 @@ struct PktUserListNtf : public PacketHeader
 	}
 };
 
-// [랜덤 입장 추가]
-// C -> S : 랜덤 방 입장 요청
+// C -> S : Request to enter a random room
 struct PktEnterRandomRoomReq : public PacketHeader
 {
-	// [수정] 생성자 추가
 	PktEnterRandomRoomReq()
 	{
 		memset(this, 0, sizeof(PktEnterRandomRoomReq));
@@ -209,6 +207,5 @@ struct PktEnterRandomRoomReq : public PacketHeader
 		type = PacketType::EnterRandomRoomReq;
 	}
 };
-
 
 #pragma pack(pop)
