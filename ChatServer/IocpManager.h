@@ -3,7 +3,7 @@
 
 namespace IocpManager
 {
-    // functions for IOCP management
+    // IOCP managements
     bool InitIocp(int threadCount);
     void StartWorkerThreads(int threadCount);
     void StartTimeoutThread();
@@ -11,7 +11,7 @@ namespace IocpManager
 
     HANDLE GetIocpHandle();
 
-    // functions for session management
+    // session managements
     void AddSession(Session* pSession);
     void RemoveSession(SOCKET socket, Session* pSession);
 }

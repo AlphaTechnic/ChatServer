@@ -10,5 +10,5 @@ struct ChatLogEntry
     std::string message;
 };
 
-void LogChatMessage(int roomID, const std::string& userID, const std::string& message);
+void PersistChatMessage(int roomID, const std::string& userID, const std::string& message);
 void CleanupOldChatLogs();

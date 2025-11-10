@@ -7,7 +7,7 @@ static std::mutex g_dbMutex;
 
 
 // store chat message in the in-memory database
-void LogChatMessage(int roomID, const std::string& userID, const std::string& message)
+void PersistChatMessage(int roomID, const std::string& userID, const std::string& message)
 {
     std::lock_guard<std::mutex> lock(g_dbMutex);
 
