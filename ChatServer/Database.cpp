@@ -2,7 +2,6 @@
 #include "Database.h"
 
 static std::deque<ChatLogEntry> g_chatLogDB;
-// mutex for thread-safe access to g_chatLogDB
 static std::mutex g_dbMutex;
 
 

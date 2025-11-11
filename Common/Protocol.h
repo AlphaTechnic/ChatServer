@@ -144,6 +144,16 @@ struct PktChatReq : public PacketHeader
 	}
 };
 
+struct PktEnterRandomRoomReq : public PacketHeader
+{
+    PktEnterRandomRoomReq()
+    {
+        memset(this, 0, sizeof(PktEnterRandomRoomReq));
+        packetLength = sizeof(PktEnterRandomRoomReq);
+        type = PacketType::EnterRandomRoomReq;
+    }
+};
+
 // S -> C : notify chat message
 struct PktChatNtf : public PacketHeader
 {
@@ -194,17 +204,6 @@ struct PktUserListNtf : public PacketHeader
         memset(this, 0, sizeof(PktUserListNtf));
 		packetLength = sizeof(PktUserListNtf);
 		type = PacketType::UserListNtf;
-	}
-};
-
-// C -> S : Request to enter a random room
-struct PktEnterRandomRoomReq : public PacketHeader
-{
-	PktEnterRandomRoomReq()
-	{
-		memset(this, 0, sizeof(PktEnterRandomRoomReq));
-		packetLength = sizeof(PktEnterRandomRoomReq);
-		type = PacketType::EnterRandomRoomReq;
 	}
 };
 

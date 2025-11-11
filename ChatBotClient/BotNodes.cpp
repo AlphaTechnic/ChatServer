@@ -3,8 +3,6 @@
 #include "Bot.h"
 #include "BotUtility.h"
 
-// leaf nodes
-
 NodeStatus Cond_IsState::Tick(Bot* bot)
 {
     return (bot->GetState() == m_targetState) ? NodeStatus::Success : NodeStatus::Failure;

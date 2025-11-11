@@ -20,9 +20,10 @@ namespace NetworkClient
 		{
             // receive data from server
 			int nRecv = recv(g_serverSocket, recvBuffer, MAX_BUFFER_SIZE, 0);
+            // 0: Server closed the connection gracefully
+            // -1: Socket error when closesocket() is called in Disconnect()
 			if (nRecv <= 0)
 			{
-                // server closed normally, -1: socket error (when Disconnect() calls closesocket())
 				if (g_isConnected)
 				{
                     std::cout << "[System] Disconnected from server." << std::endl;

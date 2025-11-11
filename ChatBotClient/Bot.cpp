@@ -105,7 +105,7 @@ void Bot::SendPacket(char* pPacket, int size)
     }
 }
 
-// state accessors (Thread-safe)
+// state accessors
 BotState Bot::GetState() { return m_state.load(); }
 int Bot::GetRoomID() { return m_currentRoomID; }
 const std::string& Bot::GetUserID() { return m_userID; }
