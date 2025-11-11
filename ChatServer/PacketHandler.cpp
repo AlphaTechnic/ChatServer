@@ -4,9 +4,12 @@
 #include "GameLogic.h"
 #include "Database.h"
 
-void PostSend(Session* pSession, char* pPacket, int size)
+/**
+* This function dynamically allocates an OverlappedEx structure for sending.
+* The allocated resource should be deleted in the WorkerThread's IOOperation::Send case after the send operation is complete.
+*/
+void SendPacketAsync(Session* pSession, char* pPacket, int size)
 {
-    // deallocating in the completion routine after send is done
     OverlappedEx* pOverlappedEx = new OverlappedEx();
     ZeroMemory(pOverlappedEx, sizeof(OverlappedEx));
 
@@ -49,7 +52,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 
         PktLoginRes res;
         res.success = true;
-        PostSend(pSession, (char*)&res, res.packetLength);
+        SendPacketAsync(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -64,7 +67,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
         PktCreateRoomRes res;
         res.success = true;
         res.newRoomID = pNewRoom->GetID();
-        PostSend(pSession, (char*)&res, res.packetLength);
+        SendPacketAsync(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -85,7 +88,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
                 res.roomID = pRoom->GetID();
             }
         }
-        PostSend(pSession, (char*)&res, res.packetLength);
+        SendPacketAsync(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -113,7 +116,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
                 std::cout << "[System] Random entry failed (Race Condition) for User '" << pSession->userID << "'." << std::endl;
             }
         }
-        PostSend(pSession, (char*)&res, res.packetLength);
+        SendPacketAsync(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -135,7 +138,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 
         PktLeaveRoomRes res;
         res.success = true;
-        PostSend(pSession, (char*)&res, res.packetLength);
+        SendPacketAsync(pSession, (char*)&res, res.packetLength);
         break;
     }
 
