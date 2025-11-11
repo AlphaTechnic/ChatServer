@@ -80,8 +80,7 @@ int main()
 
         Session* pSession = new Session(clientSocket);
         IocpManager::AddSession(pSession);
-        // pass pSession as CompletionKey
-        CreateIoCompletionPort((HANDLE)clientSocket, IocpManager::GetIocpHandle(), (ULONG_PTR)pSession, 0);
+        CreateIoCompletionPort((HANDLE)clientSocket, IocpManager::GetIocpHandle(), (ULONG_PTR)pSession, 0); // pass pSession as CompletionKey
 
         DWORD recvBytes = 0;
         DWORD flags = 0;
