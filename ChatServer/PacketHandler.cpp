@@ -8,7 +8,7 @@
 * This function dynamically allocates an OverlappedEx structure for sending.
 * The allocated resource should be deleted in the WorkerThread's IOOperation::Send case after the send operation is complete.
 */
-void SendPacketAsync(Session* pSession, char* pPacket, int size)
+void PostSend(Session* pSession, char* pPacket, int size)
 {
     OverlappedEx* pOverlappedEx = new OverlappedEx();
     ZeroMemory(pOverlappedEx, sizeof(OverlappedEx));
@@ -52,7 +52,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 
         PktLoginRes res;
         res.success = true;
-        SendPacketAsync(pSession, (char*)&res, res.packetLength);
+        PostSend(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -67,7 +67,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
         PktCreateRoomRes res;
         res.success = true;
         res.newRoomID = pNewRoom->GetID();
-        SendPacketAsync(pSession, (char*)&res, res.packetLength);
+        PostSend(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -88,7 +88,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
                 res.roomID = pRoom->GetID();
             }
         }
-        SendPacketAsync(pSession, (char*)&res, res.packetLength);
+        PostSend(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -116,7 +116,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
                 std::cout << "[System] Random entry failed (Race Condition) for User '" << pSession->userID << "'." << std::endl;
             }
         }
-        SendPacketAsync(pSession, (char*)&res, res.packetLength);
+        PostSend(pSession, (char*)&res, res.packetLength);
         break;
     }
 
@@ -138,7 +138,7 @@ void ProcessPacket(Session* pSession, char* pPacketData)
 
         PktLeaveRoomRes res;
         res.success = true;
-        SendPacketAsync(pSession, (char*)&res, res.packetLength);
+        PostSend(pSession, (char*)&res, res.packetLength);
         break;
     }
 
