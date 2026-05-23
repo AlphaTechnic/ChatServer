@@ -1,4 +1,4 @@
-## Chatting-IOCP 과제
+## Chatting-IOCP
 
 IOCP(Input/Output Completion Port) 모델을 사용한 C++ 채팅 서버 및 클라이언트, 봇 시뮬레이터입니다.
 
